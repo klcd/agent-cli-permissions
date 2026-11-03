@@ -54,7 +54,7 @@ test('2. Unknown or unrepresentable rules fail loudly', () => {
 test('3. Company baseline deny cannot be weakened by project allow', () => {
   const baseline = {
     allow: ['Bash(pwd)'],
-    deny: ['Bash(sudo)', 'Bash(sudo:*)', 'Bash(su:*)'],
+    deny: ['Bash(sudo)', 'Bash(sudo:*)', 'Bash(su:*)', 'Bash(shutdown)', 'Bash(rm -rf /)'],
     ask: []
   };
 
@@ -77,6 +77,16 @@ test('3. Company baseline deny cannot be weakened by project allow', () => {
   assert.throws(() => {
     verifyNoDenyWeakening(baseline, maliciousProject2);
   }, /Security violation: Project rule 'Bash\(su - admin\)' attempts to allow command denied by baseline rule/);
+
+  const maliciousProject3 = {
+    allow: ['Bash(rm -rf /)'],
+    deny: [],
+    ask: []
+  };
+
+  assert.throws(() => {
+    verifyNoDenyWeakening(baseline, maliciousProject3);
+  }, /Security violation: Project rule 'Bash\(rm -rf \/\)' attempts to allow command denied by baseline rule/);
 });
 
 test('4. Codex execpolicy evaluation: Expected allows and expected denies', () => {
@@ -90,30 +100,57 @@ test('4. Codex execpolicy evaluation: Expected allows and expected denies', () =
 
   const rulePaths = [userCodex, projectCodex];
 
-  // Baseline allows
+  // Baseline inspection allows
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'status']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'diff']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'log']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'show']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'branch', '--show-current']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'remote', '-v']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'rev-parse', 'HEAD']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['pwd']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['whoami']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['date']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['uname']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['which', 'node']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['rg', 'pattern']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['grep', 'pattern']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['head', 'file']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['tail', 'file']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['jq', '.']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['sort', 'file']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['uniq', 'file']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['wc', '-l', 'file']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['diff', 'a', 'b']), 'allow');
 
-  // Project allows
+  // Project workflow allows
   assert.equal(checkCodexPolicy(rulePaths, ['just', 'test']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['just', 'agent-permissions-sync']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['just', 'agent-permissions-check']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['node', '--test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['npm', 'test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['npm', 'run', 'test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'add', '.']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'commit', '-m', 'test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'checkout', 'main']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'stash']), 'allow');
 
-  // Baseline hard denies
+  // Baseline hard denies: Privilege escalation
   assert.equal(checkCodexPolicy(rulePaths, ['sudo', 'true']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['sudo', 'rm', '-rf', '/']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['su']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['su', '-']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['doas', 'ls']), 'forbidden');
+
+  // Baseline hard denies: Disk & system destruction
+  assert.equal(checkCodexPolicy(rulePaths, ['dd', 'if=/dev/zero', 'of=/dev/sda']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['mkfs', '/dev/sda1']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['fdisk', '/dev/sda']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['parted', '/dev/sda']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['shutdown', '-h', 'now']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['reboot']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['poweroff']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['rm', '-rf', '/']), 'forbidden');
 });
 
 test('5. Codex execpolicy conflict resolution: forbidden strictly overrides allow', () => {
@@ -146,8 +183,8 @@ prefix_rule(
 
 test('6. Generation is deterministic and idempotent', () => {
   const policy = {
-    allow: ['Bash(git status)', 'Bash(git diff)', 'Bash(pwd)'],
-    deny: ['Bash(sudo)', 'Bash(su:*)'],
+    allow: ['Bash(git status)', 'Bash(git diff)', 'Bash(pwd)', 'Bash(whoami)', 'Bash(jq)'],
+    deny: ['Bash(sudo)', 'Bash(su:*)', 'Bash(shutdown)', 'Bash(dd)'],
     ask: []
   };
 

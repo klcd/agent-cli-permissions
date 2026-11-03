@@ -1,6 +1,13 @@
 name: project
 description: Project-specific permissions for permission-setup repository
 allow:
-  - "Bash(just agent-permissions-sync)"
   - "Bash(just agent-permissions-check)"
+  - "Bash(just agent-permissions-sync)"
   - "Bash(just test)"
+  - "Bash(git add)"
+  - "Bash(git checkout)"
+  - "Bash(git commit)"
+  - "Bash(git restore)"
+  - "Bash(git stash)"
+  - "Bash(git stash list)"
+  - "Bash(git stash pop)"

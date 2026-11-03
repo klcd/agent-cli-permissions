@@ -23,7 +23,10 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Verify Generated Files Are In Sync (No Drift)
+      - name: Synchronize Native Configurations
+        run: node scripts/sync-permissions.mjs
+
+      - name: Verify Configurations Are In Sync & Idempotent
         run: node scripts/sync-permissions.mjs --check
 
       - name: Run Deterministic Policy Test Suite

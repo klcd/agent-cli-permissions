@@ -2,3 +2,5 @@ name: development
 description: Safe local development test and verification commands
 allow:
   - "Bash(node --test)"
+  - "Bash(npm test)"
+  - "Bash(npm run test)"
