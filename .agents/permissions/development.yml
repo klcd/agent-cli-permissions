@@ -1,0 +1,4 @@
+name: development
+description: Safe local development test and verification commands
+allow:
+  - "Bash(node --test)"

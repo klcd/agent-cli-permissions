@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(just agent-permissions-check)",
+      "Bash(just agent-permissions-sync)",
+      "Bash(just test)",
+      "Bash(node --test)"
+    ],
+    "deny": []
+  }
+}

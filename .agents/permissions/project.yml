@@ -1,0 +1,6 @@
+name: project
+description: Project-specific permissions for permission-setup repository
+allow:
+  - "Bash(just agent-permissions-sync)"
+  - "Bash(just agent-permissions-check)"
+  - "Bash(just test)"

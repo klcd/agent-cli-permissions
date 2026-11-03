@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "command(just agent-permissions-check)",
+      "command(just agent-permissions-sync)",
+      "command(just test)",
+      "command(node --test)"
+    ],
+    "deny": []
+  }
+}

@@ -1,0 +1,27 @@
+# GENERATED FILE.
+# Source: .agents/permissions/
+# Do not edit manually.
+
+prefix_rule(
+    pattern = ["just", "agent-permissions-check"],
+    decision = "allow",
+    justification = "Allowed by .agents/permissions/",
+)
+
+prefix_rule(
+    pattern = ["just", "agent-permissions-sync"],
+    decision = "allow",
+    justification = "Allowed by .agents/permissions/",
+)
+
+prefix_rule(
+    pattern = ["just", "test"],
+    decision = "allow",
+    justification = "Allowed by .agents/permissions/",
+)
+
+prefix_rule(
+    pattern = ["node", "--test"],
+    decision = "allow",
+    justification = "Allowed by .agents/permissions/",
+)
