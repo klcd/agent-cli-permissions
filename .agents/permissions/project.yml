@@ -1,13 +1,20 @@
 name: project
-description: Project-specific permissions for permission-setup repository
+description: Project-specific permissions for permission-setup repository with argument patterns
 allow:
+  # Task runner
   - "Bash(just agent-permissions-check)"
   - "Bash(just agent-permissions-sync)"
   - "Bash(just test)"
-  - "Bash(git add)"
-  - "Bash(git checkout)"
-  - "Bash(git commit)"
-  - "Bash(git restore)"
+  - "Bash(just test:*)"
+
+  # Safe local Git staging and branch operations
+  - "Bash(git add:*)"
+  - "Bash(git checkout:*)"
+  - "Bash(git commit:*)"
+  - "Bash(git restore:*)"
   - "Bash(git stash)"
-  - "Bash(git stash list)"
-  - "Bash(git stash pop)"
+  - "Bash(git stash:*)"
+  - "Bash(git switch:*)"
+  - "Bash(git merge --abort)"
+  - "Bash(git rebase --abort)"
+  - "Bash(git cherry-pick --abort)"

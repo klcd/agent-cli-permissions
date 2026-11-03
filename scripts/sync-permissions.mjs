@@ -6,13 +6,15 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import yaml from 'yaml';
 
-// Blanket arbitrary code executors that must never be broadly allowed
-const FORBIDDEN_BLANKET_EXECUTORS = new Set([
+// Blanket arbitrary code executors and sensitive tools that must never be broadly allowed
+export const FORBIDDEN_BLANKET_EXECUTORS = new Set([
   'bash', 'sh', 'zsh', 'fish', 'csh', 'tcsh', 'ksh',
   'python', 'python3', 'python2', 'node', 'bun', 'deno',
   'ruby', 'perl', 'php', 'env',
   'npm run', 'pnpm run', 'yarn run', 'bun run',
-  'make', 'just'
+  'make', 'just',
+  'docker', 'podman', 'kubectl', 'helm', 'terraform', 'tofu', 'nix',
+  'ssh', 'curl', 'wget'
 ]);
 
 /**
@@ -54,10 +56,10 @@ export function validatePermissionSet(set, filePath) {
       }
 
       if (parsed.tool === 'Bash' && listName === 'allow') {
-        // Check for forbidden blanket executors
-        const normPattern = parsed.pattern.toLowerCase().trim();
+        // Strip trailing :* or * to check the base command
+        const normPattern = parsed.pattern.toLowerCase().replace(/:?\*$/, '').trim();
         if (FORBIDDEN_BLANKET_EXECUTORS.has(normPattern)) {
-          throw new Error(`Security violation: Broad arbitrary-code executor '${rule}' in '${filePath}' is prohibited! Use specific subcommands.`);
+          throw new Error(`Security violation: Broad arbitrary-code executor or un-scoped tool '${rule}' in '${filePath}' is prohibited! Use specific subcommands.`);
         }
       }
     }
@@ -116,10 +118,10 @@ export function verifyNoDenyWeakening(baselinePolicy, projectPolicy) {
   for (const allowRule of projectPolicy.allow) {
     const parsed = parseCanonicalRule(allowRule);
     if (parsed.tool !== 'Bash') continue;
-    const allowTokens = parsed.pattern.split(/\s+/).filter(Boolean);
+    const cleanPattern = parsed.pattern.replace(/:?\*$/, '').trim();
+    const allowTokens = cleanPattern.split(/\s+/).filter(Boolean);
 
     for (const bDeny of baselineDenyPrefixes) {
-      // Check if allowTokens start with bDeny tokens
       if (allowTokens.length >= bDeny.tokens.length) {
         let matches = true;
         for (let i = 0; i < bDeny.tokens.length; i++) {
@@ -416,20 +418,30 @@ export async function main(args = process.argv.slice(2)) {
 
   const testAssertions = [
     { cmd: ['git', 'status'], expected: 'allow', desc: 'Baseline allow: git status' },
+    { cmd: ['git', 'status', '--short'], expected: 'allow', desc: 'Baseline pattern: git status --short' },
     { cmd: ['git', 'diff'], expected: 'allow', desc: 'Baseline allow: git diff' },
+    { cmd: ['git', 'diff', '--staged'], expected: 'allow', desc: 'Baseline pattern: git diff --staged' },
     { cmd: ['pwd'], expected: 'allow', desc: 'Baseline allow: pwd' },
-    { cmd: ['rg', 'test'], expected: 'allow', desc: 'Baseline allow: rg' },
+    { cmd: ['rg', 'test'], expected: 'allow', desc: 'Baseline pattern: rg test' },
+    { cmd: ['grep', '-rn', 'foo', '.'], expected: 'allow', desc: 'Baseline pattern: grep -rn foo .' },
+    { cmd: ['docker', 'ps'], expected: 'allow', desc: 'Infrastructure allow: docker ps' },
+    { cmd: ['docker', 'ps', '-a'], expected: 'allow', desc: 'Infrastructure pattern: docker ps -a' },
+    { cmd: ['kubectl', 'get', 'pods'], expected: 'allow', desc: 'Infrastructure pattern: kubectl get pods' },
+    { cmd: ['terraform', 'validate'], expected: 'allow', desc: 'Infrastructure allow: terraform validate' },
     { cmd: ['just', 'test'], expected: 'allow', desc: 'Project allow: just test' },
-    { cmd: ['just', 'agent-permissions-sync'], expected: 'allow', desc: 'Project allow: just agent-permissions-sync' },
-    { cmd: ['node', '--test'], expected: 'allow', desc: 'Project allow: node --test' },
+    { cmd: ['just', 'test', 'tests/permissions.test.mjs'], expected: 'allow', desc: 'Project pattern: just test with args' },
+    { cmd: ['git', 'add', '-A'], expected: 'allow', desc: 'Project pattern: git add -A' },
     { cmd: ['sudo', 'true'], expected: 'forbidden', desc: 'Baseline deny: sudo true' },
     { cmd: ['sudo', 'rm', '-rf', '/'], expected: 'forbidden', desc: 'Baseline deny: sudo rm -rf /' },
     { cmd: ['su', '-'], expected: 'forbidden', desc: 'Baseline deny: su -' },
     { cmd: ['doas', 'ls'], expected: 'forbidden', desc: 'Baseline deny: doas ls' },
+    { cmd: ['rm', '-rf', '/'], expected: 'forbidden', desc: 'Baseline deny: rm -rf /' },
+    { cmd: ['dd', 'if=/dev/zero', 'of=/dev/sda'], expected: 'forbidden', desc: 'Baseline deny: dd' },
   ];
 
   let testFailures = 0;
   for (const test of testAssertions) {
+    if (!test.expected) test.expected = 'allow';
     const actual = checkCodexPolicy(ruleFilesToCheck, test.cmd);
     if (actual === test.expected) {
       console.log(`  ✓ ${test.desc} -> ${actual}`);

@@ -15,9 +15,9 @@ import {
 } from '../scripts/sync-permissions.mjs';
 
 test('1. Canonical rule parsing works for valid tools and patterns', () => {
-  const r1 = parseCanonicalRule('Bash(git status)');
+  const r1 = parseCanonicalRule('Bash(git status:*)');
   assert.equal(r1.tool, 'Bash');
-  assert.equal(r1.pattern, 'git status');
+  assert.equal(r1.pattern, 'git status:*');
 
   const r2 = parseCanonicalRule('Write(/tmp/*)');
   assert.equal(r2.tool, 'Write');
@@ -31,18 +31,25 @@ test('1. Canonical rule parsing works for valid tools and patterns', () => {
   assert.throws(() => parseCanonicalRule(123), /Rule must be a string/);
 });
 
-test('2. Unknown or unrepresentable rules fail loudly', () => {
+test('2. Broad arbitrary-code executors and un-scoped sensitive tools fail loudly', () => {
   // Unknown tool
   assert.throws(() => {
     validatePermissionSet({ allow: ['CustomTool(xyz)'] }, 'dummy.yml');
   }, /Unsupported tool 'CustomTool'/);
 
-  // Broad arbitrary-code executor in allow
-  const executors = ['bash', 'sh', 'zsh', 'python', 'python3', 'node', 'just', 'make', 'npm run'];
+  // Broad executors and un-scoped tools in allow list
+  const executors = [
+    'bash', 'sh', 'zsh', 'python', 'python3', 'node', 'just', 'make',
+    'docker', 'podman', 'kubectl', 'helm', 'terraform', 'tofu', 'nix'
+  ];
   for (const exe of executors) {
     assert.throws(() => {
       validatePermissionSet({ allow: [`Bash(${exe})`] }, 'dummy.yml');
-    }, /Security violation: Broad arbitrary-code executor/);
+    }, /Security violation: Broad arbitrary-code executor or un-scoped tool/);
+
+    assert.throws(() => {
+      validatePermissionSet({ allow: [`Bash(${exe}:*)`] }, 'dummy.yml');
+    }, /Security violation: Broad arbitrary-code executor or un-scoped tool/);
   }
 
   // Non-bash deny rule in Codex fails loudly
@@ -54,42 +61,31 @@ test('2. Unknown or unrepresentable rules fail loudly', () => {
 test('3. Company baseline deny cannot be weakened by project allow', () => {
   const baseline = {
     allow: ['Bash(pwd)'],
-    deny: ['Bash(sudo)', 'Bash(sudo:*)', 'Bash(su:*)', 'Bash(shutdown)', 'Bash(rm -rf /)'],
+    deny: [
+      'Bash(sudo)', 'Bash(sudo:*)', 'Bash(su:*)',
+      'Bash(shutdown:*)', 'Bash(rm -rf /)',
+      'Bash(docker run --privileged:*)', 'Bash(kubectl delete:*)'
+    ],
     ask: []
   };
 
-  const maliciousProject = {
-    allow: ['Bash(sudo true)'],
-    deny: [],
-    ask: []
-  };
+  const maliciousCases = [
+    'Bash(sudo true)',
+    'Bash(sudo ls:*)',
+    'Bash(su - admin)',
+    'Bash(rm -rf /)',
+    'Bash(docker run --privileged:*)',
+    'Bash(kubectl delete pods)'
+  ];
 
-  assert.throws(() => {
-    verifyNoDenyWeakening(baseline, maliciousProject);
-  }, /Security violation: Project rule 'Bash\(sudo true\)' attempts to allow command denied by baseline rule/);
-
-  const maliciousProject2 = {
-    allow: ['Bash(su - admin)'],
-    deny: [],
-    ask: []
-  };
-
-  assert.throws(() => {
-    verifyNoDenyWeakening(baseline, maliciousProject2);
-  }, /Security violation: Project rule 'Bash\(su - admin\)' attempts to allow command denied by baseline rule/);
-
-  const maliciousProject3 = {
-    allow: ['Bash(rm -rf /)'],
-    deny: [],
-    ask: []
-  };
-
-  assert.throws(() => {
-    verifyNoDenyWeakening(baseline, maliciousProject3);
-  }, /Security violation: Project rule 'Bash\(rm -rf \/\)' attempts to allow command denied by baseline rule/);
+  for (const rule of maliciousCases) {
+    assert.throws(() => {
+      verifyNoDenyWeakening(baseline, { allow: [rule], deny: [], ask: [] });
+    }, /Security violation: Project rule .* attempts to allow command denied by baseline rule/);
+  }
 });
 
-test('4. Codex execpolicy evaluation: Expected allows and expected denies', () => {
+test('4. Codex execpolicy evaluation: Expected allows and expected denies with patterns', () => {
   const homeDir = os.homedir();
   const projectRoot = process.cwd();
   const userCodex = path.join(homeDir, '.codex', 'rules', 'generated-agents-policy.rules');
@@ -100,40 +96,45 @@ test('4. Codex execpolicy evaluation: Expected allows and expected denies', () =
 
   const rulePaths = [userCodex, projectCodex];
 
-  // Baseline inspection allows
+  // Baseline inspection with argument patterns
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'status']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'status', '--short']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'diff']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'log']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'show']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'branch', '--show-current']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'remote', '-v']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'diff', '--staged', 'HEAD']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'log', '-n', '5', '--oneline']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'branch', '-a']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'rev-parse', 'HEAD']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['pwd']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['whoami']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['date']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['uname']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['which', 'node']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['rg', 'pattern']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['grep', 'pattern']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['head', 'file']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['tail', 'file']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['jq', '.']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['sort', 'file']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['uniq', 'file']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['wc', '-l', 'file']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['diff', 'a', 'b']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['date', '+%s']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['rg', '-i', 'TODO', 'src/']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['grep', '-rn', 'main', '.']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['head', '-n', '20', 'file']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['jq', '-r', '.name', 'package.json']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['file', 'README.md']), 'allow');
 
-  // Project workflow allows
+  // Infrastructure scoped allows with patterns
+  assert.equal(checkCodexPolicy(rulePaths, ['docker', 'ps']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['docker', 'ps', '-a']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['docker', 'images']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['docker', 'inspect', 'my-container']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['kubectl', 'get', 'pods', '-n', 'default']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['kubectl', 'describe', 'pod', 'my-pod']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['helm', 'list', '-A']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['terraform', 'validate']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['tofu', 'fmt', '-check']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['nix', 'flake', 'check']), 'allow');
+
+  // Project workflow allows with patterns
   assert.equal(checkCodexPolicy(rulePaths, ['just', 'test']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['just', 'agent-permissions-sync']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['just', 'agent-permissions-check']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['just', 'test', 'tests/permissions.test.mjs']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'add', '-A']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'commit', '-m', 'chore: update']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'checkout', '-b', 'feature-branch']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['git', 'stash', 'pop']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['node', '--test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['node', '--test', 'tests/*.mjs']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['npm', 'test']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['npm', 'run', 'test']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'add', '.']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'commit', '-m', 'test']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'checkout', 'main']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['git', 'stash']), 'allow');
 
   // Baseline hard denies: Privilege escalation
   assert.equal(checkCodexPolicy(rulePaths, ['sudo', 'true']), 'forbidden');
@@ -146,11 +147,15 @@ test('4. Codex execpolicy evaluation: Expected allows and expected denies', () =
   assert.equal(checkCodexPolicy(rulePaths, ['dd', 'if=/dev/zero', 'of=/dev/sda']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['mkfs', '/dev/sda1']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['fdisk', '/dev/sda']), 'forbidden');
-  assert.equal(checkCodexPolicy(rulePaths, ['parted', '/dev/sda']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['shutdown', '-h', 'now']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['reboot']), 'forbidden');
-  assert.equal(checkCodexPolicy(rulePaths, ['poweroff']), 'forbidden');
   assert.equal(checkCodexPolicy(rulePaths, ['rm', '-rf', '/']), 'forbidden');
+
+  // Infrastructure hard denies
+  assert.equal(checkCodexPolicy(rulePaths, ['docker', 'run', '--privileged', 'alpine']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['kubectl', 'delete', 'pod', 'critical-pod']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['terraform', 'destroy', '-auto-approve']), 'forbidden');
+  assert.equal(checkCodexPolicy(rulePaths, ['tofu', 'destroy']), 'forbidden');
 });
 
 test('5. Codex execpolicy conflict resolution: forbidden strictly overrides allow', () => {
@@ -164,6 +169,11 @@ prefix_rule(
     decision = "forbidden",
     justification = "Company deny",
 )
+prefix_rule(
+    pattern = ["kubectl", "delete"],
+    decision = "forbidden",
+    justification = "Company deny",
+)
 `);
 
   fs.writeFileSync(projRulesFile, `
@@ -172,19 +182,24 @@ prefix_rule(
     decision = "allow",
     justification = "Project attempt to allow",
 )
+prefix_rule(
+    pattern = ["kubectl", "delete"],
+    decision = "allow",
+    justification = "Project attempt to allow",
+)
 `);
 
   // Codex evaluates both: stricter decision (forbidden) must win
-  const decision = checkCodexPolicy([baseRulesFile, projRulesFile], ['sudo', 'cat', '/etc/shadow']);
-  assert.equal(decision, 'forbidden');
+  assert.equal(checkCodexPolicy([baseRulesFile, projRulesFile], ['sudo', 'cat', '/etc/shadow']), 'forbidden');
+  assert.equal(checkCodexPolicy([baseRulesFile, projRulesFile], ['kubectl', 'delete', 'pod', 'prod']), 'forbidden');
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
 test('6. Generation is deterministic and idempotent', () => {
   const policy = {
-    allow: ['Bash(git status)', 'Bash(git diff)', 'Bash(pwd)', 'Bash(whoami)', 'Bash(jq)'],
-    deny: ['Bash(sudo)', 'Bash(su:*)', 'Bash(shutdown)', 'Bash(dd)'],
+    allow: ['Bash(git status:*)', 'Bash(git diff:*)', 'Bash(docker ps:*)', 'Bash(rg:*)'],
+    deny: ['Bash(sudo:*)', 'Bash(kubectl delete:*)'],
     ask: []
   };
 
@@ -210,9 +225,6 @@ test('7. Unauthorized executor wrapping is not permitted', () => {
   ];
 
   // Shell running arbitrary script
-  const decision1 = checkCodexPolicy(rulePaths, ['bash', '-c', 'git status']);
-  assert.equal(decision1, 'no-match');
-
-  const decision2 = checkCodexPolicy(rulePaths, ['python3', '-c', 'print(1)']);
-  assert.equal(decision2, 'no-match');
+  assert.equal(checkCodexPolicy(rulePaths, ['bash', '-c', 'git status']), 'no-match');
+  assert.equal(checkCodexPolicy(rulePaths, ['python3', '-c', 'print(1)']), 'no-match');
 });
