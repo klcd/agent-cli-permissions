@@ -228,3 +228,22 @@ test('7. Unauthorized executor wrapping is not permitted', () => {
   assert.equal(checkCodexPolicy(rulePaths, ['bash', '-c', 'git status']), 'no-match');
   assert.equal(checkCodexPolicy(rulePaths, ['python3', '-c', 'print(1)']), 'no-match');
 });
+
+test('8. Modular components in lib/*.mjs can be imported directly', async () => {
+  const parser = await import('../scripts/lib/parser.mjs');
+  const validator = await import('../scripts/lib/validator.mjs');
+  const compilers = await import('../scripts/lib/compilers.mjs');
+
+  assert.equal(typeof parser.parsePolicyYaml, 'function');
+  assert.equal(typeof parser.parseCanonicalRule, 'function');
+  assert.equal(typeof validator.validatePermissionSet, 'function');
+  assert.equal(typeof validator.verifyNoDenyWeakening, 'function');
+  assert.equal(typeof compilers.compileCodexRules, 'function');
+  assert.equal(typeof compilers.compileClaudePermissions, 'function');
+  assert.equal(typeof compilers.compileAntigravityPermissions, 'function');
+
+  // Verify pure parser behavior via direct sub-module
+  const parsed = parser.parsePolicyYaml('name: test\nallow:\n  - "Bash(pwd)"');
+  assert.equal(parsed.name, 'test');
+  assert.deepEqual(parsed.allow, ['Bash(pwd)']);
+});

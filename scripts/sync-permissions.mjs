@@ -1,302 +1,51 @@
 #!/usr/bin/env node
 
+/**
+ * Unified Coding-Agent Permission Synchronizer & CLI
+ *
+ * Compiles canonical YAML permissions (.agents/permissions/*.yml) into:
+ *   - Codex execpolicy (.codex/rules/*.rules)
+ *   - Claude permissions (.claude/settings.json)
+ *   - Antigravity permissions (.gemini/settings.json)
+ *
+ * Supports two policy layers:
+ *   1. Company / Baseline (~/.agents/permissions/)
+ *   2. Project-Specific (<repo>/.agents/permissions/)
+ *
+ * Zero external npm dependencies (pure standard Node.js ES module).
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 
-/**
- * Lightweight, zero-dependency YAML parser for canonical agent permissions
- */
-export function parsePolicyYaml(text) {
-  const result = { allow: [], deny: [], ask: [] };
-  const lines = text.split(/\r?\n/);
-  let currentKey = null;
+// Re-export modular components for external callers and tests
+export {
+  parsePolicyYaml,
+  parseCanonicalRule
+} from './lib/parser.mjs';
 
-  for (let line of lines) {
-    // Strip comments unless inside quotes
-    const commentIdx = line.indexOf('#');
-    if (commentIdx !== -1) {
-      const before = line.slice(0, commentIdx);
-      const singleQuotes = (before.match(/'/g) || []).length;
-      const doubleQuotes = (before.match(/"/g) || []).length;
-      if (singleQuotes % 2 === 0 && doubleQuotes % 2 === 0) {
-        line = before;
-      }
-    }
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+export {
+  FORBIDDEN_BLANKET_EXECUTORS,
+  validatePermissionSet,
+  loadPolicyDirectory,
+  verifyNoDenyWeakening
+} from './lib/validator.mjs';
 
-    // Check for top-level scalar keys: "key: value" or list starts: "key:"
-    const topMatch = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
-    if (topMatch) {
-      const key = topMatch[1];
-      const val = topMatch[2].trim();
-      if (key === 'allow' || key === 'deny' || key === 'ask') {
-        currentKey = key;
-        continue;
-      } else {
-        currentKey = null;
-        let unquoted = val;
-        if ((unquoted.startsWith('"') && unquoted.endsWith('"')) || (unquoted.startsWith("'") && unquoted.endsWith("'"))) {
-          unquoted = unquoted.slice(1, -1);
-        }
-        result[key] = unquoted;
-        continue;
-      }
-    }
+export {
+  compileCodexRules,
+  compileClaudePermissions,
+  compileAntigravityPermissions
+} from './lib/compilers.mjs';
 
-    // Check for list item: "  - value"
-    const itemMatch = line.match(/^\s*-\s+(.*)$/);
-    if (itemMatch && currentKey) {
-      let item = itemMatch[1].trim();
-      if ((item.startsWith('"') && item.endsWith('"')) || (item.startsWith("'") && item.endsWith("'"))) {
-        item = item.slice(1, -1);
-      }
-      result[currentKey].push(item);
-    }
-  }
-  return result;
-}
-
-// Blanket arbitrary code executors and sensitive tools that must never be broadly allowed
-export const FORBIDDEN_BLANKET_EXECUTORS = new Set([
-  'bash', 'sh', 'zsh', 'fish', 'csh', 'tcsh', 'ksh',
-  'python', 'python3', 'python2', 'node', 'bun', 'deno',
-  'ruby', 'perl', 'php', 'env',
-  'npm run', 'pnpm run', 'yarn run', 'bun run',
-  'make', 'just',
-  'docker', 'podman', 'kubectl', 'helm', 'terraform', 'tofu', 'nix',
-  'ssh', 'curl', 'wget'
-]);
-
-/**
- * Parses a canonical rule like "Bash(git status)" or "Write(/tmp/*)"
- */
-export function parseCanonicalRule(ruleStr) {
-  if (typeof ruleStr !== 'string') {
-    throw new Error(`Rule must be a string, got: ${typeof ruleStr}`);
-  }
-  const match = ruleStr.trim().match(/^(\w+)\((.*)\)$/);
-  if (!match) {
-    throw new Error(`Invalid canonical rule syntax: '${ruleStr}'. Expected Format: 'Tool(pattern)' (e.g. 'Bash(git status)')`);
-  }
-  const tool = match[1];
-  const pattern = match[2].trim();
-  return { tool, pattern, raw: ruleStr };
-}
-
-/**
- * Validates a permission set object
- */
-export function validatePermissionSet(set, filePath) {
-  if (!set || typeof set !== 'object') {
-    throw new Error(`Invalid permission file '${filePath}': must be a YAML object`);
-  }
-  const allowedTools = new Set(['Bash', 'Read', 'Write', 'WebSearch', 'WebFetch']);
-
-  for (const listName of ['allow', 'deny', 'ask']) {
-    const list = set[listName];
-    if (!list) continue;
-    if (!Array.isArray(list)) {
-      throw new Error(`Invalid '${listName}' block in '${filePath}': must be an array`);
-    }
-
-    for (const rule of list) {
-      const parsed = parseCanonicalRule(rule);
-      if (!allowedTools.has(parsed.tool)) {
-        throw new Error(`Unsupported tool '${parsed.tool}' in '${rule}' within '${filePath}'. Supported tools: ${Array.from(allowedTools).join(', ')}`);
-      }
-
-      if (parsed.tool === 'Bash' && listName === 'allow') {
-        // Strip trailing :* or * to check the base command
-        const normPattern = parsed.pattern.toLowerCase().replace(/:?\*$/, '').trim();
-        if (FORBIDDEN_BLANKET_EXECUTORS.has(normPattern)) {
-          throw new Error(`Security violation: Broad arbitrary-code executor or un-scoped tool '${rule}' in '${filePath}' is prohibited! Use specific subcommands.`);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Reads all .yml/.yaml policy files from a directory
- */
-export function loadPolicyDirectory(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    return { name: path.basename(dirPath), allow: [], deny: [], ask: [], files: [] };
-  }
-
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  const allows = new Set();
-  const denies = new Set();
-  const asks = new Set();
-  const loadedFiles = [];
-
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!entry.name.endsWith('.yml') && !entry.name.endsWith('.yaml')) continue;
-
-    const fullPath = path.join(dirPath, entry.name);
-    const content = fs.readFileSync(fullPath, 'utf8');
-    const parsed = parsePolicyYaml(content);
-    if (!parsed) continue;
-
-    validatePermissionSet(parsed, fullPath);
-
-    (parsed.allow || []).forEach(r => allows.add(r));
-    (parsed.deny || []).forEach(r => denies.add(r));
-    (parsed.ask || []).forEach(r => asks.add(r));
-    loadedFiles.push(entry.name);
-  }
-
-  return {
-    allow: Array.from(allows).sort(),
-    deny: Array.from(denies).sort(),
-    ask: Array.from(asks).sort(),
-    files: loadedFiles.sort()
-  };
-}
-
-/**
- * Checks that project rules cannot weaken or contradict baseline denies.
- */
-export function verifyNoDenyWeakening(baselinePolicy, projectPolicy) {
-  const baselineDenyPrefixes = baselinePolicy.deny.map(r => {
-    const parsed = parseCanonicalRule(r);
-    const cmd = parsed.pattern.replace(/:?\*$/, '').trim();
-    return { raw: r, tokens: cmd.split(/\s+/).filter(Boolean) };
-  });
-
-  for (const allowRule of projectPolicy.allow) {
-    const parsed = parseCanonicalRule(allowRule);
-    if (parsed.tool !== 'Bash') continue;
-    const cleanPattern = parsed.pattern.replace(/:?\*$/, '').trim();
-    const allowTokens = cleanPattern.split(/\s+/).filter(Boolean);
-
-    for (const bDeny of baselineDenyPrefixes) {
-      if (allowTokens.length >= bDeny.tokens.length) {
-        let matches = true;
-        for (let i = 0; i < bDeny.tokens.length; i++) {
-          if (allowTokens[i] !== bDeny.tokens[i]) {
-            matches = false;
-            break;
-          }
-        }
-        if (matches) {
-          throw new Error(`Security violation: Project rule '${allowRule}' attempts to allow command denied by baseline rule '${bDeny.raw}'! Baseline denies cannot be weakened.`);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Compiles canonical rules into Codex Starlark prefix_rule statements.
- */
-export function compileCodexRules(policy, sourceDescription) {
-  const rules = [];
-  const seen = new Set();
-
-  function addRule(ruleStr, decision, justification) {
-    const parsed = parseCanonicalRule(ruleStr);
-    if (parsed.tool !== 'Bash') {
-      if (decision === 'forbidden') {
-        throw new Error(`ERROR: Codex execpolicy cannot faithfully represent non-Bash deny rule '${ruleStr}'`);
-      }
-      return; // Codex execpolicy only evaluates command executions
-    }
-
-    const command = parsed.pattern.replace(/:?\*$/, '').trim();
-    if (!command) return;
-    const tokens = command.split(/\s+/).filter(Boolean);
-    const patternStr = tokens.map(t => JSON.stringify(t)).join(', ');
-    const key = `${decision}:${patternStr}`;
-
-    if (seen.has(key)) return;
-    seen.add(key);
-
-    rules.push({
-      key,
-      tokens,
-      decision,
-      code: `prefix_rule(\n    pattern = [${patternStr}],\n    decision = "${decision}",\n    justification = "${justification}",\n)`
-    });
-  }
-
-  // Denies first (highest precedence)
-  for (const rule of policy.deny) {
-    addRule(rule, 'forbidden', 'Forbidden by shared agent security policy');
-  }
-
-  // Asks second
-  for (const rule of policy.ask) {
-    addRule(rule, 'prompt', 'Requires approval by agent security policy');
-  }
-
-  // Allows third
-  for (const rule of policy.allow) {
-    addRule(rule, 'allow', `Allowed by ${sourceDescription}`);
-  }
-
-  // Sort rules deterministically: forbidden first, then prompt, then allow; then by token string
-  const decisionOrder = { forbidden: 0, prompt: 1, allow: 2 };
-  rules.sort((a, b) => {
-    if (decisionOrder[a.decision] !== decisionOrder[b.decision]) {
-      return decisionOrder[a.decision] - decisionOrder[b.decision];
-    }
-    return a.tokens.join(' ').localeCompare(b.tokens.join(' '));
-  });
-
-  const ruleTexts = rules.map(r => r.code);
-  const header = `# GENERATED FILE.\n# Source: ${sourceDescription}\n# Do not edit manually.\n\n`;
-  return header + (ruleTexts.length > 0 ? ruleTexts.join('\n\n') + '\n' : '# No rules generated.\n');
-}
-
-/**
- * Compiles canonical rules into Claude native permissions JSON block
- */
-export function compileClaudePermissions(policy) {
-  const allow = Array.from(new Set(policy.allow)).sort();
-  const deny = Array.from(new Set(policy.deny)).sort();
-  const ask = Array.from(new Set(policy.ask || [])).sort();
-
-  const permissions = { allow, deny };
-  if (ask.length > 0) {
-    permissions.ask = ask;
-  }
-  return permissions;
-}
-
-/**
- * Compiles canonical rules into Antigravity native permissions JSON block
- */
-export function compileAntigravityPermissions(policy) {
-  const mapRule = (r) => {
-    const parsed = parseCanonicalRule(r);
-    if (parsed.tool === 'Bash') {
-      let p = parsed.pattern;
-      if (p.endsWith(':*')) {
-        p = p.slice(0, -2) + ' *';
-      }
-      return `command(${p})`;
-    }
-    if (parsed.tool === 'Read') return `read_file(${parsed.pattern})`;
-    if (parsed.tool === 'Write') return `write_file(${parsed.pattern})`;
-    if (parsed.tool === 'WebFetch') return `read_url(${parsed.pattern})`;
-    return null;
-  };
-
-  const allow = Array.from(new Set(policy.allow.map(mapRule).filter(Boolean))).sort();
-  const deny = Array.from(new Set(policy.deny.map(mapRule).filter(Boolean))).sort();
-  const ask = Array.from(new Set((policy.ask || []).map(mapRule).filter(Boolean))).sort();
-
-  const permissions = { allow, deny };
-  if (ask.length > 0) {
-    permissions.ask = ask;
-  }
-  return permissions;
-}
+import { parsePolicyYaml } from './lib/parser.mjs';
+import { loadPolicyDirectory, verifyNoDenyWeakening } from './lib/validator.mjs';
+import {
+  compileCodexRules,
+  compileClaudePermissions,
+  compileAntigravityPermissions
+} from './lib/compilers.mjs';
 
 /**
  * Safely writes file if content changed, returning boolean indicating if change was made
