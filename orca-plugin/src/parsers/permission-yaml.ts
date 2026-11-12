@@ -197,6 +197,59 @@ export function inspectNativeSync(workspacePath: string, homeDir = os.homedir())
     } catch {}
   }
 
+  // Detect remote company policy URL
+  let remotePolicyUrl: string | null = null
+  if (process.env.COMPANY_PERMISSIONS_URL) {
+    remotePolicyUrl = process.env.COMPANY_PERMISSIONS_URL.trim()
+  } else if (process.env.AGENT_PERMISSIONS_URL) {
+    remotePolicyUrl = process.env.AGENT_PERMISSIONS_URL.trim()
+  } else {
+    const candidateConfigs = [
+      path.join(workspacePath, '.agents', 'config.json'),
+      path.join(homeDir, '.agents', 'config.json'),
+    ]
+    for (const cfgPath of candidateConfigs) {
+      if (fs.existsSync(cfgPath)) {
+        try {
+          const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'))
+          if (cfg.remoteBaselineUrl || cfg.companyPermissionsUrl) {
+            remotePolicyUrl = (cfg.remoteBaselineUrl || cfg.companyPermissionsUrl).trim()
+            break
+          }
+        } catch {}
+      }
+    }
+  }
+
+  const remoteCachePath = path.join(homeDir, '.agents', 'cache', 'company-remote-baseline.yml')
+  const remotePolicyCached = fs.existsSync(remoteCachePath)
+
+  // Detect Claude Code SessionStart auto-sync hook
+  let sessionStartHookActive = false
+  for (const p of [claudeSettingsPath, path.join(homeDir, '.claude', 'settings.json')]) {
+    if (fs.existsSync(p)) {
+      try {
+        const raw = fs.readFileSync(p, 'utf8')
+        if (raw.includes('agent-cli-permissions sync') || raw.includes('agent-permissions sync')) {
+          sessionStartHookActive = true
+          break
+        }
+      } catch {}
+    }
+  }
+
+  // Detect Git pre-commit compliance hook
+  const gitHookPath = path.join(workspacePath, '.git', 'hooks', 'pre-commit')
+  let gitHookActive = false
+  if (fs.existsSync(gitHookPath)) {
+    try {
+      const gitContent = fs.readFileSync(gitHookPath, 'utf8')
+      if (gitContent.includes('agent-cli-permissions check') || gitContent.includes('agent-permissions check')) {
+        gitHookActive = true
+      }
+    } catch {}
+  }
+
   return {
     claudeSettingsPath,
     claudeSynced,
@@ -209,5 +262,9 @@ export function inspectNativeSync(workspacePath: string, homeDir = os.homedir())
     geminiSynced,
     geminiAllowCount,
     geminiDenyCount,
+    remotePolicyUrl,
+    remotePolicyCached,
+    sessionStartHookActive,
+    gitHookActive,
   }
 }

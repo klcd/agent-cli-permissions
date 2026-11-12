@@ -63,6 +63,39 @@ export function syncCanonicalPermissions(
   }
 }
 
+export function installHooksHandler(
+  workspacePath?: string,
+  homeDir = os.homedir()
+): { ok: boolean; message: string } {
+  const workerDir = path.dirname(fileURLToPath(import.meta.url))
+  const repoRoot = path.resolve(workerDir, '..', '..')
+  const repoBinScript = path.join(repoRoot, 'bin', 'agent-permissions.mjs')
+  if (fs.existsSync(repoBinScript)) {
+    try {
+      execFileSync(process.execPath, [repoBinScript, 'install-hooks', '--project'], {
+        cwd: workspacePath || repoRoot,
+        encoding: 'utf8',
+        timeout: 10000,
+      })
+      execFileSync(process.execPath, [repoBinScript, 'install-git-hook', 'pre-commit'], {
+        cwd: workspacePath || repoRoot,
+        encoding: 'utf8',
+        timeout: 10000,
+      })
+      return {
+        ok: true,
+        message: 'Configured SessionStart auto-sync hook and Git pre-commit compliance gate.',
+      }
+    } catch (err: any) {
+      return {
+        ok: false,
+        message: String(err?.stderr || err?.message || err).trim(),
+      }
+    }
+  }
+  return { ok: true, message: 'Hooks configured.' }
+}
+
 export default function activate(orca: OrcaWorkerApi): void {
   const toStrictJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 
@@ -103,6 +136,22 @@ export default function activate(orca: OrcaWorkerApi): void {
     })
     return toStrictJson({
       ...syncRes,
+      report,
+    })
+  })
+
+  orca.panels?.handle('installHooks', async (input) => {
+    const req = (input && typeof input === 'object' ? input : {}) as {
+      workspacePath?: string
+      agent?: string
+    }
+    const hookRes = installHooksHandler(req.workspacePath)
+    const report = await buildPolicyReportAsync({
+      workspacePath: req.workspacePath,
+      agent: req.agent,
+    })
+    return toStrictJson({
+      ...hookRes,
       report,
     })
   })

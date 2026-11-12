@@ -98,6 +98,10 @@ export interface NativeAgentSyncStatus {
   geminiSynced: boolean
   geminiAllowCount: number
   geminiDenyCount: number
+  remotePolicyUrl: string | null
+  remotePolicyCached: boolean
+  sessionStartHookActive: boolean
+  gitHookActive: boolean
 }
 
 export interface ActiveSandboxInfo {

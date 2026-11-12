@@ -7,3 +7,5 @@
 .cursor/cli-config.json
 .gemini/settings.json
 opencode.json
+.orca/
+

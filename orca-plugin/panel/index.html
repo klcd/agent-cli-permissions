@@ -510,6 +510,17 @@ details.egress-fold[open] > summary .fold-chevron {
         <span id="agentStateBadge" class="badge allow">DENY &gt; ASK &gt; ALLOW</span>
       </div>
     </div>
+    <div id="governanceBanner" class="card" style="padding:6px 10px;margin-top:6px;gap:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;flex-wrap:wrap;">
+          <span style="opacity:0.7;">Governance:</span>
+          <span id="remoteBadge" class="badge neutral" title="Remote company policy status">Local Only</span>
+          <span id="hookBadge" class="badge neutral" title="SessionStart auto-sync hook status">No Hook</span>
+          <span id="gitGateBadge" class="badge neutral" title="Git pre-commit compliance gate status">No Git Gate</span>
+        </div>
+        <button id="installHooksBtn" style="font-size:10px;padding:2px 8px;height:22px;flex-shrink:0;" title="Install SessionStart auto-sync hook and Git pre-commit compliance gate">Enforce</button>
+      </div>
+    </div>
   </div>
 
   <!-- Interactive CLI Command Permission Evaluator -->
@@ -681,8 +692,8 @@ details.egress-fold[open] > summary .fold-chevron {
     }
     const syncBadge = document.getElementById("syncBadge");
     if (syncBadge) {
-      const ns = report.nativeSync;
-      const syncedCount = (ns?.claudeSynced ? 1 : 0) + (ns?.codexSynced ? 1 : 0) + (ns?.geminiSynced ? 1 : 0);
+      const ns2 = report.nativeSync;
+      const syncedCount = (ns2?.claudeSynced ? 1 : 0) + (ns2?.codexSynced ? 1 : 0) + (ns2?.geminiSynced ? 1 : 0);
       if (syncedCount >= 2) {
         syncBadge.className = "badge allow";
         syncBadge.textContent = "Synced";
@@ -691,6 +702,57 @@ details.egress-fold[open] > summary .fold-chevron {
         syncBadge.className = "badge neutral";
         syncBadge.textContent = `${report.permissionGroups.length} groups`;
         syncBadge.title = "Loaded permission groups from ~/.agents/permissions/*.yml";
+      }
+    }
+    const ns = report.nativeSync;
+    const remoteBadge = document.getElementById("remoteBadge");
+    if (remoteBadge) {
+      if (ns?.remotePolicyUrl) {
+        remoteBadge.className = "badge allow";
+        remoteBadge.textContent = "Remote Policy";
+        remoteBadge.title = `Remote URL: ${ns.remotePolicyUrl}${ns.remotePolicyCached ? " (Cached)" : ""}`;
+      } else {
+        remoteBadge.className = "badge neutral";
+        remoteBadge.textContent = "Local Only";
+        remoteBadge.title = "No remote company policy configured in ~/.agents/config.json";
+      }
+    }
+    const hookBadge = document.getElementById("hookBadge");
+    if (hookBadge) {
+      if (ns?.sessionStartHookActive) {
+        hookBadge.className = "badge allow";
+        hookBadge.textContent = "Auto-Sync Active";
+        hookBadge.title = "Claude SessionStart hook is installed in .claude/settings.json";
+      } else {
+        hookBadge.className = "badge neutral";
+        hookBadge.textContent = "No Auto-Sync";
+        hookBadge.title = "Claude SessionStart hook not installed";
+      }
+    }
+    const gitGateBadge = document.getElementById("gitGateBadge");
+    if (gitGateBadge) {
+      if (ns?.gitHookActive) {
+        gitGateBadge.className = "badge allow";
+        gitGateBadge.textContent = "Git Gate Active";
+        gitGateBadge.title = ".git/hooks/pre-commit compliance gate installed";
+      } else {
+        gitGateBadge.className = "badge neutral";
+        gitGateBadge.textContent = "No Git Gate";
+        gitGateBadge.title = ".git/hooks/pre-commit hook not installed";
+      }
+    }
+    const installHooksBtn = document.getElementById("installHooksBtn");
+    if (installHooksBtn) {
+      if (ns?.sessionStartHookActive && ns?.gitHookActive) {
+        installHooksBtn.textContent = "Enforced";
+        installHooksBtn.className = "badge allow";
+        installHooksBtn.disabled = true;
+        installHooksBtn.title = "SessionStart hook and Git pre-commit gate are both active";
+      } else {
+        installHooksBtn.textContent = "Enforce";
+        installHooksBtn.className = "";
+        installHooksBtn.disabled = false;
+        installHooksBtn.title = "Install SessionStart auto-sync hook and Git pre-commit compliance gate";
       }
     }
   }
@@ -833,6 +895,39 @@ details.egress-fold[open] > summary .fold-chevron {
         if (syncBtn) {
           syncBtn.disabled = false;
           syncBtn.textContent = "Sync Rules";
+        }
+      }
+    });
+    document.getElementById("installHooksBtn")?.addEventListener("click", async () => {
+      const btn = document.getElementById("installHooksBtn");
+      const notice = document.getElementById("syncStatusNotice");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Enforcing...";
+      }
+      try {
+        const report = panelState.currentReport;
+        const res = await window.orca.plugin.request("installHooks", {
+          workspacePath: report?.selectedWorkspace?.path
+        });
+        if (notice) {
+          notice.style.display = "flex";
+          notice.innerHTML = `<div style="display:flex;align-items:center;gap:6px;"><span class="badge ${res.ok ? "allow" : "deny"}">${res.ok ? "ENFORCED" : "ERROR"}</span><span class="sub">${escapeHtml(res.message)}</span></div>`;
+        }
+        if (res.report) {
+          panelState.currentReport = res.report;
+          renderHeader();
+          renderPermissionsView();
+        }
+      } catch (err) {
+        if (notice) {
+          notice.style.display = "flex";
+          notice.innerHTML = `<div style="display:flex;align-items:center;gap:6px;"><span class="badge deny">ERROR</span><span class="sub">${escapeHtml(err?.message || err)}</span></div>`;
+        }
+      } finally {
+        if (btn && (!panelState.currentReport?.nativeSync?.sessionStartHookActive || !panelState.currentReport?.nativeSync?.gitHookActive)) {
+          btn.disabled = false;
+          btn.textContent = "Enforce";
         }
       }
     });
