@@ -70,7 +70,7 @@ flowchart TD
 | **Kimi** | `~/.kimi-code/config.toml` | `<repo>/.kimi-code/config.toml` | TOML `[permission] rules = [...]` |
 | **Droid** | `~/.factory/settings.json` | `<repo>/.factory/settings.json` | `commandAllowlist`, `commandDenylist` |
 
-*(Note: Generated local native files and directories are ignored in `.gitignore`.)*
+*(Note: Dedicated generated permission files like `.codex/rules/generated-agents-policy.rules` and `.claude/settings.local.json` are ignored in `.gitignore`. Whole agent directories (`.claude/`, `.codex/`, `.gemini/`) are never ignored so skills, commands, and custom rules remain trackable. Settings files are only gitignored if they contain solely permissions and no other configs like hooks or MCP.)*
 
 ---
 

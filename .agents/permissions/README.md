@@ -56,7 +56,7 @@ The canonical permission configuration lives under `.agents/permissions/`.
 - **Global / Company Baseline:** `~/.agents/permissions/*.yml`
 - **Repository / Project Rules:** `<repo>/.agents/permissions/*.yml`
 
-Vendor-native configuration folders (`.claude/`, `.codex/`, `.gemini/`) are **generated local artifacts** ignored by `.gitignore` and must **not** be edited or committed manually.
+Dedicated generated permission files (e.g., `.codex/rules/generated-agents-policy.rules`, `.claude/settings.local.json`) are ignored in `.gitignore`. Whole agent directories are **never** ignored, and settings files are only gitignored if they contain solely generated permissions and no other configurations (such as hooks or MCP).
 
 ---
 

@@ -313,3 +313,102 @@ test('10. Agents reading .agents natively are skipped from redundant compilation
     AGENTS_READING_CANONICAL_DIRECTLY.delete('mock-native-agent');
   }
 });
+
+test('11. isPurePermissionsFile distinguishes pure permissions from files with hooks/MCP', async () => {
+  const { isPurePermissionsFile } = await import('../scripts/lib/gitignore.mjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pure-perm-test-'));
+
+  try {
+    // Non-existent file defaults to pure
+    assert.equal(isPurePermissionsFile(path.join(tmpDir, 'absent.json')), true);
+
+    // Empty object
+    const emptyFile = path.join(tmpDir, 'empty.json');
+    fs.writeFileSync(emptyFile, '{}');
+    assert.equal(isPurePermissionsFile(emptyFile), true);
+
+    // Pure permissions
+    const pureFile = path.join(tmpDir, 'pure.json');
+    fs.writeFileSync(pureFile, JSON.stringify({ permissions: { allow: ['Bash(pwd)'], deny: [] } }));
+    assert.equal(isPurePermissionsFile(pureFile), true);
+
+    // File with hooks
+    const hooksFile = path.join(tmpDir, 'with-hooks.json');
+    fs.writeFileSync(hooksFile, JSON.stringify({
+      hooks: { SessionStart: [{ command: "echo test" }] },
+      permissions: { allow: ['Bash(pwd)'] }
+    }));
+    assert.equal(isPurePermissionsFile(hooksFile), false);
+
+    // File with MCP servers
+    const mcpFile = path.join(tmpDir, 'with-mcp.json');
+    fs.writeFileSync(mcpFile, JSON.stringify({
+      mcpServers: { myServer: { command: "node server.js" } },
+      permissions: { allow: ['Bash(pwd)'] }
+    }));
+    assert.equal(isPurePermissionsFile(mcpFile), false);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('12. syncGitignore never ignores whole directories and excludes files with other configs', async () => {
+  const { syncGitignore, getExpectedGitignoreEntries } = await import('../scripts/lib/gitignore.mjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitignore-test-'));
+
+  try {
+    // Setup simulated repository
+    fs.mkdirSync(path.join(tmpDir, '.claude'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.codex', 'rules'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.gemini'), { recursive: true });
+
+    // .claude/settings.json has MCP and hooks
+    fs.writeFileSync(path.join(tmpDir, '.claude', 'settings.json'), JSON.stringify({
+      mcpServers: { test: {} },
+      permissions: { allow: [] }
+    }));
+
+    // .gemini/settings.json is pure permissions
+    fs.writeFileSync(path.join(tmpDir, '.gemini', 'settings.json'), JSON.stringify({
+      permissions: { allow: [] }
+    }));
+
+    // Initialize with old-style broad directory ignores
+    fs.writeFileSync(path.join(tmpDir, '.gitignore'), [
+      '.DS_Store',
+      '.claude/',
+      '.codex/',
+      '.gemini/',
+      '.cursor/'
+    ].join('\n'));
+
+    // Sync gitignore
+    const res = syncGitignore(tmpDir);
+    assert.equal(res.changed, true);
+
+    const updated = fs.readFileSync(path.join(tmpDir, '.gitignore'), 'utf8');
+
+    // Must NOT contain broad directory ignores
+    const lines = updated.split('\n').map(l => l.trim());
+    assert.ok(!lines.includes('.claude/'));
+    assert.ok(!lines.includes('.claude'));
+    assert.ok(!lines.includes('.codex/'));
+    assert.ok(!lines.includes('.codex'));
+    assert.ok(!lines.includes('.gemini/'));
+    assert.ok(!lines.includes('.gemini'));
+    assert.ok(!lines.includes('.cursor/'));
+    assert.ok(!lines.includes('.cursor'));
+
+    // .claude/settings.json has MCP, so it must NOT be ignored
+    assert.ok(!lines.includes('.claude/settings.json'));
+
+    // .gemini/settings.json is pure permissions, so it IS ignored
+    assert.ok(lines.includes('.gemini/settings.json'));
+
+    // Dedicated generated rules are always ignored
+    assert.ok(lines.includes('.codex/rules/generated-agents-policy.rules'));
+    assert.ok(lines.includes('.claude/settings.local.json'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

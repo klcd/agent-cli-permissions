@@ -50,6 +50,12 @@ export {
   requiresNativeCompiler
 } from './lib/compilers.mjs';
 
+export {
+  isPurePermissionsFile,
+  getExpectedGitignoreEntries,
+  syncGitignore
+} from './lib/gitignore.mjs';
+
 import { parsePolicyYaml } from './lib/parser.mjs';
 import { loadPolicyDirectory, verifyNoDenyWeakening } from './lib/validator.mjs';
 import {
@@ -60,6 +66,10 @@ import {
   compileOpenCodePermissions,
   requiresNativeCompiler
 } from './lib/compilers.mjs';
+import {
+  isPurePermissionsFile,
+  syncGitignore
+} from './lib/gitignore.mjs';
 
 /**
  * Safely writes file if content changed, returning boolean indicating if change was made
@@ -303,7 +313,11 @@ export async function main(args = process.argv.slice(2)) {
   const userClaudePerms = compileClaudePermissions(baselinePolicy);
   const projectClaudePerms = compileClaudePermissions(projectPolicy);
   const userClaudePath = path.join(homeDir, '.claude', 'settings.json');
-  const projectClaudePath = path.join(projectRoot, '.claude', 'settings.json');
+  // If .claude/settings.json has other configs (hooks, MCP), write permissions to .claude/settings.local.json
+  const projectClaudeSettingsPath = path.join(projectRoot, '.claude', 'settings.json');
+  const projectClaudeLocalPath = path.join(projectRoot, '.claude', 'settings.local.json');
+  const hasOtherClaudeConfigs = !isPurePermissionsFile(projectClaudeSettingsPath);
+  const projectClaudePath = hasOtherClaudeConfigs ? projectClaudeLocalPath : projectClaudeSettingsPath;
 
   // 5. Compile Antigravity permissions
   const userAntigravityPerms = compileAntigravityPermissions(baselinePolicy);
@@ -326,8 +340,8 @@ export async function main(args = process.argv.slice(2)) {
   const candidateActions = [
     { agent: 'codex', target: 'Codex (User)', path: userCodexPath, type: 'text', content: userCodexRules },
     { agent: 'codex', target: 'Codex (Project)', path: projectCodexPath, type: 'text', content: projectCodexRules },
+    { agent: 'claude', target: `Claude (${hasOtherClaudeConfigs ? 'Project Local' : 'Project'})`, path: projectClaudePath, type: 'json-permissions', content: projectClaudePerms },
     { agent: 'claude', target: 'Claude (User)', path: userClaudePath, type: 'json-permissions', content: userClaudePerms },
-    { agent: 'claude', target: 'Claude (Project)', path: projectClaudePath, type: 'json-permissions', content: projectClaudePerms },
     { agent: 'antigravity', target: 'Antigravity (User)', path: userAntigravityPath, type: 'json-permissions', content: userAntigravityPerms },
     { agent: 'antigravity', target: 'Antigravity (Project)', path: projectAntigravityPath, type: 'json-permissions', content: projectAntigravityPerms },
     { agent: 'cursor', target: 'Cursor (User)', path: userCursorPath, type: 'json-permissions', content: userCursorPerms },
@@ -393,6 +407,21 @@ export async function main(args = process.argv.slice(2)) {
           console.log(`  [${res.changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
         }
       }
+    }
+  }
+
+  // 8. Synchronize .gitignore (only ignore pure permission files; remove broad directory ignores)
+  const gitignoreRes = syncGitignore(projectRoot, isCheckMode);
+  if (isCheckMode) {
+    if (gitignoreRes.changed) {
+      driftedCount++;
+      console.error(`  [DRIFT] .gitignore has broad directory ignores or outdated permission entries! Run 'just agent-permissions-sync'.`);
+    }
+  } else {
+    if (gitignoreRes.changed) {
+      console.log(`  [UPDATED] .gitignore -> synced pure permission file ignores (removed broad directory ignores)`);
+    } else {
+      console.log(`  [UP-TO-DATE] .gitignore`);
     }
   }
 
