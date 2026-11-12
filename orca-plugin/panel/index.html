@@ -529,7 +529,7 @@ details.egress-fold[open] > summary .fold-chevron {
 </div>
 <script>
 (() => {
-  // ../AgenticCoding/permission-setup/orca-plugin/src/panel/state.ts
+  // orca-plugin/src/panel/state.ts
   var panelState = {
     currentReport: null,
     doctorReport: null,
@@ -547,7 +547,7 @@ details.egress-fold[open] > summary .fold-chevron {
     openSystemItems: new Set
   };
 
-  // ../AgenticCoding/permission-setup/orca-plugin/src/panel/utils.ts
+  // orca-plugin/src/panel/utils.ts
   function escapeHtml(str) {
     return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
@@ -565,7 +565,7 @@ details.egress-fold[open] > summary .fold-chevron {
     }
   }
 
-  // ../AgenticCoding/permission-setup/orca-plugin/src/panel/views/cli-tab.ts
+  // orca-plugin/src/panel/views/cli-tab.ts
   function renderCliTab() {
     const report = panelState.currentReport;
     if (!report)
@@ -653,7 +653,7 @@ details.egress-fold[open] > summary .fold-chevron {
   `;
   }
 
-  // ../AgenticCoding/permission-setup/orca-plugin/src/panel/main.ts
+  // orca-plugin/src/panel/main.ts
   function getInputValue(id) {
     const el = document.getElementById(id);
     return el ? el.value : "";

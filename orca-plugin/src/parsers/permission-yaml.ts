@@ -184,9 +184,16 @@ export function inspectNativeSync(workspacePath: string, homeDir = os.homedir())
     try {
       const data = JSON.parse(fs.readFileSync(geminiSettingsPath, 'utf8'))
       geminiSynced = true
-      const perms = Array.isArray(data?.permissions) ? data.permissions : []
-      geminiAllowCount = Array.isArray(data?.tools?.allowed) ? data.tools.allowed.length : perms.length
-      geminiDenyCount = Array.isArray(data?.tools?.exclude) ? data.tools.exclude.length : 0
+      if (Array.isArray(data?.permissions?.allow)) {
+        geminiAllowCount = data.permissions.allow.length
+        geminiDenyCount = Array.isArray(data?.permissions?.deny) ? data.permissions.deny.length : 0
+      } else if (Array.isArray(data?.permissions)) {
+        geminiAllowCount = data.permissions.length
+        geminiDenyCount = Array.isArray(data?.tools?.exclude) ? data.tools.exclude.length : 0
+      } else {
+        geminiAllowCount = Array.isArray(data?.tools?.allowed) ? data.tools.allowed.length : 0
+        geminiDenyCount = Array.isArray(data?.tools?.exclude) ? data.tools.exclude.length : 0
+      }
     } catch {}
   }
 
