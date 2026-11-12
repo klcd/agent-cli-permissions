@@ -1,8 +1,11 @@
 {
   "manifestVersion": 2,
   "id": "agent-permissions",
+  "publisher": "klcd",
   "name": "Agent CLI Permissions",
   "version": "0.1.0",
+  "license": "MIT",
+  "repository": "https://github.com/klcd/agent-cli-permissions",
   "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules to Claude Code, Codex, and Antigravity.",
   "engines": {
     "orca": ">=1.4.248"
