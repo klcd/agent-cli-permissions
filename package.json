@@ -1,0 +1,27 @@
+{
+  "name": "agent-permissions",
+  "version": "0.1.0",
+  "description": "Unified Coding-Agent Permission Synchronizer & CLI",
+  "type": "module",
+  "bin": {
+    "agent-permissions": "./bin/agent-permissions.mjs"
+  },
+  "scripts": {
+    "sync": "node bin/agent-permissions.mjs sync",
+    "check": "node bin/agent-permissions.mjs check",
+    "list": "node bin/agent-permissions.mjs list",
+    "view": "node bin/agent-permissions.mjs view",
+    "test": "node bin/agent-permissions.mjs test",
+    "orca:check": "node bin/agent-permissions.mjs orca check",
+    "orca:install": "node bin/agent-permissions.mjs orca install"
+  },
+  "keywords": [
+    "agents",
+    "permissions",
+    "codex",
+    "claude",
+    "antigravity",
+    "orca"
+  ],
+  "license": "MIT"
+}

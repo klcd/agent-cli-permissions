@@ -1,11 +1,23 @@
 name: project
 description: Project-specific permissions for permission-setup repository with argument patterns
 allow:
-  # Task runner
-  - "Bash(just agent-permissions-check)"
-  - "Bash(just agent-permissions-sync)"
-  - "Bash(just test)"
-  - "Bash(just test:*)"
+  # CLI & task execution
+  - "Bash(agent-permissions)"
+  - "Bash(agent-permissions:*)"
+  - "Bash(./bin/agent-permissions)"
+  - "Bash(./bin/agent-permissions:*)"
+  - "Bash(node bin/agent-permissions.mjs)"
+  - "Bash(node bin/agent-permissions.mjs:*)"
+  - "Bash(node scripts/sync-permissions.mjs)"
+  - "Bash(node scripts/sync-permissions.mjs:*)"
+  - "Bash(npm run check)"
+  - "Bash(npm run sync)"
+  - "Bash(npm run test)"
+  - "Bash(npm run test:*)"
+  - "Bash(npm test)"
+  - "Bash(npm test:*)"
+  - "Bash(node --test)"
+  - "Bash(node --test:*)"
 
   # Safe local Git staging and branch operations
   - "Bash(git add:*)"

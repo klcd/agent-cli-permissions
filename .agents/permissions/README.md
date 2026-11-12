@@ -18,7 +18,7 @@ flowchart TD
         DevRules["development.yml"]
     end
 
-    Compiler["Permission Compiler\n(just agent-permissions-sync)"]
+    Compiler["Permission Compiler\n(agent-permissions sync)"]
 
     CompanyPolicy --> Compiler
     ProjectPolicy --> Compiler
@@ -98,7 +98,7 @@ flowchart LR
 ### Project Policy (`.agents/permissions/`)
 
 - **Project Workflow (`project.yml`):**
-  - **Allow:** `just agent-permissions-sync`, `just agent-permissions-check`, `just test`, `git add`, `git commit`, `git checkout`, `git restore`, `git stash`, `git stash list`, `git stash pop`
+  - **Allow:** `agent-permissions sync`, `agent-permissions check`, `agent-permissions test`, `npm test`, `git add`, `git commit`, `git checkout`, `git restore`, `git stash`, `git stash list`, `git stash pop`
 - **Development & Testing (`development.yml`):**
   - **Allow:** `node --test`, `npm test`, `npm run test`
 
@@ -109,7 +109,8 @@ flowchart LR
 To compile canonical permissions into vendor-native files:
 
 ```bash
-just agent-permissions-sync
+./bin/agent-permissions sync
+# or: npm run sync
 ```
 
 This command:
@@ -129,7 +130,8 @@ Synchronization is strictly **deterministic** and **idempotent**. Running the sy
 To verify permissions without mutating any files:
 
 ```bash
-just agent-permissions-check
+./bin/agent-permissions check
+# or: npm run check
 ```
 
 This command checks for configuration drift between `.agents/permissions/` and native generated files, returning exit code `0` if in sync and `1` if drift is detected.
@@ -137,23 +139,25 @@ This command checks for configuration drift between `.agents/permissions/` and n
 To list all active permission sets across baseline and project scopes:
 
 ```bash
-just agent-permissions-list
+./bin/agent-permissions list
+# or: npm run list
 ```
 
 To view details and all allow/deny rules of a specific permission set:
 
 ```bash
-just agent-permissions-view <set-name>
+./bin/agent-permissions view <set-name>
 # Examples:
-# just agent-permissions-view project
-# just agent-permissions-view security-baseline
-# just agent-permissions-view infrastructure
+# ./bin/agent-permissions view project
+# ./bin/agent-permissions view security-baseline
+# ./bin/agent-permissions view infrastructure
 ```
 
 To run the automated policy test suite:
 
 ```bash
-just test
+./bin/agent-permissions test
+# or: npm test
 ```
 
 ---

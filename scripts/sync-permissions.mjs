@@ -196,7 +196,7 @@ export function listPermissions(baselineDir, projectPermsDir) {
  */
 export function viewPermissionSet(setName, baselineDir, projectPermsDir) {
   if (!setName) {
-    console.error(`\n[ERROR] Please specify a permission set name to view. Example: just agent-permissions-view security-baseline`);
+    console.error(`\n[ERROR] Please specify a permission set name to view. Example: agent-permissions view security-baseline`);
     process.exit(1);
   }
 
@@ -415,7 +415,7 @@ export async function main(args = process.argv.slice(2)) {
   if (isCheckMode) {
     if (gitignoreRes.changed) {
       driftedCount++;
-      console.error(`  [DRIFT] .gitignore has broad directory ignores or outdated permission entries! Run 'just agent-permissions-sync'.`);
+      console.error(`  [DRIFT] .gitignore has broad directory ignores or outdated permission entries! Run 'agent-permissions sync' (or 'npm run sync').`);
     }
   } else {
     if (gitignoreRes.changed) {
@@ -426,7 +426,7 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   if (isCheckMode && driftedCount > 0) {
-    console.error(`\n[ERROR] Check failed: ${driftedCount} target file(s) are missing or drifted! Run 'just agent-permissions-sync'.`);
+    console.error(`\n[ERROR] Check failed: ${driftedCount} target file(s) are missing or drifted! Run 'agent-permissions sync' (or 'npm run sync').`);
     process.exit(1);
   }
 
@@ -446,8 +446,10 @@ export async function main(args = process.argv.slice(2)) {
     { cmd: ['docker', 'ps', '-a'], expected: 'allow', desc: 'Infrastructure pattern: docker ps -a' },
     { cmd: ['kubectl', 'get', 'pods'], expected: 'allow', desc: 'Infrastructure pattern: kubectl get pods' },
     { cmd: ['terraform', 'validate'], expected: 'allow', desc: 'Infrastructure allow: terraform validate' },
-    { cmd: ['just', 'test'], expected: 'allow', desc: 'Project allow: just test' },
-    { cmd: ['just', 'test', 'tests/permissions.test.mjs'], expected: 'allow', desc: 'Project pattern: just test with args' },
+    { cmd: ['agent-permissions', 'test'], expected: 'allow', desc: 'Project allow: agent-permissions test' },
+    { cmd: ['agent-permissions', 'check'], expected: 'allow', desc: 'Project pattern: agent-permissions check' },
+    { cmd: ['./bin/agent-permissions', 'test'], expected: 'allow', desc: 'Project pattern: ./bin/agent-permissions test' },
+    { cmd: ['node', '--test'], expected: 'allow', desc: 'Project allow: node --test' },
     { cmd: ['git', 'add', '-A'], expected: 'allow', desc: 'Project pattern: git add -A' },
     { cmd: ['sudo', 'true'], expected: 'forbidden', desc: 'Baseline deny: sudo true' },
     { cmd: ['sudo', 'rm', '-rf', '/'], expected: 'forbidden', desc: 'Baseline deny: sudo rm -rf /' },

@@ -76,24 +76,32 @@ flowchart TD
 
 ## Commands
 
-All commands are defined in [`justfile`](file:///Users/cedric/Projects/AgenticCoding/permission-setup/justfile):
+The repository provides a zero-dependency CLI at [`bin/agent-permissions`](file:///Users/cedric/Projects/AgenticCoding/permission-setup/bin/agent-permissions) (also exposed via `package.json` and standard `npm` scripts):
 
 ```bash
 # Synchronize canonical rules into all native agent formats
-just agent-permissions-sync
+./bin/agent-permissions sync
+# or: npm run sync
 
 # Verify zero drift between canonical rules and generated targets
-just agent-permissions-check
+./bin/agent-permissions check
+# or: npm run check
 
 # List all installed permission sets across baseline and project
-just agent-permissions-list
+./bin/agent-permissions list
+# or: npm run list
 
 # View full allow/deny rules for a specific set
-just agent-permissions-view security-baseline
-just agent-permissions-view project
+./bin/agent-permissions view security-baseline
+./bin/agent-permissions view project
 
 # Run the complete test suite (syntax, security, execpolicy assertions)
-just test
+./bin/agent-permissions test
+# or: npm test
+
+# Orca Plugin tasks
+./bin/agent-permissions orca check      # Build panel, validate manifest, run plugin tests
+./bin/agent-permissions orca install    # Build panel and install plugin into local Orca
 ```
 
 ---

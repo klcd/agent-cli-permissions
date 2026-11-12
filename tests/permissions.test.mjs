@@ -126,8 +126,9 @@ test('4. Codex execpolicy evaluation: Expected allows and expected denies with p
   assert.equal(checkCodexPolicy(rulePaths, ['nix', 'flake', 'check']), 'allow');
 
   // Project workflow allows with patterns
-  assert.equal(checkCodexPolicy(rulePaths, ['just', 'test']), 'allow');
-  assert.equal(checkCodexPolicy(rulePaths, ['just', 'test', 'tests/permissions.test.mjs']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['agent-permissions', 'test']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['agent-permissions', 'check']), 'allow');
+  assert.equal(checkCodexPolicy(rulePaths, ['./bin/agent-permissions', 'test']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'add', '-A']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'commit', '-m', 'chore: update']), 'allow');
   assert.equal(checkCodexPolicy(rulePaths, ['git', 'checkout', '-b', 'feature-branch']), 'allow');
