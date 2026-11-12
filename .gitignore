@@ -2,7 +2,6 @@
 *.tmp
 
 # Generated native agent permission files (only ignored if purely permissions)
-.claude/settings.json
 .claude/settings.local.json
 .codex/rules/generated-agents-policy.rules
 .cursor/cli-config.json

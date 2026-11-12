@@ -135,10 +135,86 @@ npx agent-cli-permissions view project
 npx agent-cli-permissions test
 # or: npm test
 
+# Configure forced agent SessionStart auto-sync hooks
+npx agent-cli-permissions install-hooks --global
+# or for this repo only: npx agent-cli-permissions install-hooks --project
+
+# Install Git pre-commit compliance gate
+npx agent-cli-permissions install-git-hook pre-commit
+
 # Orca Plugin tasks
 npx agent-cli-permissions orca check      # Build panel, validate manifest, run plugin tests
 npx agent-cli-permissions orca install    # Build panel and install plugin into local Orca
 ```
+
+---
+
+## Remote Company Policy Delivery (via Webpage / HTTPS)
+
+Security teams can host their canonical company baseline policy on a central web endpoint—such as a corporate intranet, GitHub Raw, S3/Cloudflare R2 bucket, or internal policy service:
+
+```bash
+# Sync with explicit remote policy URL:
+npx agent-cli-permissions sync --remote https://security.internal.corp/agents/baseline.yml
+
+# Or export the environment variable in developer profiles or MDM:
+export COMPANY_PERMISSIONS_URL="https://security.internal.corp/agents/baseline.yml"
+npx agent-cli-permissions sync
+```
+
+Alternatively, configure the URL persistently in `~/.agents/config.json` (or `.agents/config.json`):
+```json
+{
+  "remoteBaselineUrl": "https://security.internal.corp/agents/baseline.yml"
+}
+```
+
+### Offline Caching & Resilience
+Remote policies are cached locally at `~/.agents/cache/company-remote-baseline.yml`. If a developer is working offline or the corporate intranet is temporarily unreachable, `agent-cli-permissions` automatically falls back to the validated cached policy, ensuring developer workflows are never blocked.
+
+---
+
+## Forced Installation & Enterprise Enforcement
+
+To ensure developers and AI agents cannot bypass company guardrails, `agent-cli-permissions` supports four enforcement layers:
+
+### 1. Agent `SessionStart` Auto-Sync Hook (Forced on Agent Launch)
+AI agents like Claude Code support startup hooks. By configuring:
+```bash
+npx agent-cli-permissions install-hooks --global
+```
+Every time an AI agent session initializes, it automatically executes:
+```bash
+npx --yes agent-cli-permissions sync --silent
+```
+This forces the latest company security rules to be fetched and applied *before* the agent executes any tool calls.
+
+### 2. Enterprise Bootstrap Script (`install.sh`)
+For zero-touch MDM fleet deployment (Jamf, Kandji, Microsoft Intune, Ansible, or dotfiles):
+```bash
+# One-line enterprise bootstrap:
+curl -fsSL https://raw.githubusercontent.com/klcd/agent-cli-permissions/main/install.sh | sh
+
+# With custom company policy URL:
+COMPANY_PERMISSIONS_URL="https://security.internal.corp/agents/baseline.yml" \
+  curl -fsSL https://raw.githubusercontent.com/klcd/agent-cli-permissions/main/install.sh | sh
+```
+The script validates Node.js, configures the baseline URL, compiles all agent targets, and installs the global `SessionStart` hook.
+
+### 3. Git Pre-Commit Compliance Gate
+To prevent developers from accidentally committing out-of-sync or unvalidated rules:
+```bash
+npx agent-cli-permissions install-git-hook pre-commit
+```
+Blocks git commits if configuration drift or policy weakening is detected.
+
+### 4. CI/CD Gatekeeper (GitHub Actions / GitLab CI)
+Run `npx agent-cli-permissions check` in continuous integration:
+```yaml
+- name: Verify Agent Permissions & Precedence
+  run: npx agent-cli-permissions check
+```
+If a pull request attempts to bypass baseline `DENY` rules or drifts from the canonical definitions, the CI pipeline fails with exit code `1`.
 
 ---
 

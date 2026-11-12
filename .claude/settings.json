@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./bin/agent-cli-permissions)",
+      "Bash(./bin/agent-cli-permissions:*)",
+      "Bash(./bin/agent-permissions)",
+      "Bash(./bin/agent-permissions:*)",
+      "Bash(agent-cli-permissions)",
+      "Bash(agent-cli-permissions:*)",
+      "Bash(agent-permissions)",
+      "Bash(agent-permissions:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git cherry-pick --abort)",
+      "Bash(git commit:*)",
+      "Bash(git merge --abort)",
+      "Bash(git rebase --abort)",
+      "Bash(git restore:*)",
+      "Bash(git stash)",
+      "Bash(git stash:*)",
+      "Bash(git switch:*)",
+      "Bash(node --test)",
+      "Bash(node --test:*)",
+      "Bash(node bin/agent-permissions.mjs)",
+      "Bash(node bin/agent-permissions.mjs:*)",
+      "Bash(node src/sync-permissions.mjs)",
+      "Bash(node src/sync-permissions.mjs:*)",
+      "Bash(npm run check)",
+      "Bash(npm run sync)",
+      "Bash(npm run test)",
+      "Bash(npm run test:*)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(npx .)",
+      "Bash(npx .:*)",
+      "Bash(npx agent-cli-permissions)",
+      "Bash(npx agent-cli-permissions:*)",
+      "Bash(npx agent-permissions)",
+      "Bash(npx agent-permissions:*)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "npx --yes agent-cli-permissions sync --silent"
+      }
+    ]
+  }
+}

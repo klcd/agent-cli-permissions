@@ -414,3 +414,113 @@ test('12. syncGitignore never ignores whole directories and excludes files with 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('13. resolveRemoteBaselineUrl resolves CLI flag, env var, and config.json', async () => {
+  const { resolveRemoteBaselineUrl } = await import('../src/lib/remote-policy.mjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-url-test-'));
+
+  try {
+    // 1. CLI option takes highest precedence
+    const cliRes = resolveRemoteBaselineUrl({ remoteUrl: 'https://cli.example.com/policy.yml' }, tmpDir, tmpDir);
+    assert.equal(cliRes, 'https://cli.example.com/policy.yml');
+
+    // 2. Environment variable
+    const oldEnv = process.env.COMPANY_PERMISSIONS_URL;
+    process.env.COMPANY_PERMISSIONS_URL = 'https://env.example.com/policy.yml';
+    try {
+      const envRes = resolveRemoteBaselineUrl({}, tmpDir, tmpDir);
+      assert.equal(envRes, 'https://env.example.com/policy.yml');
+    } finally {
+      if (oldEnv !== undefined) process.env.COMPANY_PERMISSIONS_URL = oldEnv;
+      else delete process.env.COMPANY_PERMISSIONS_URL;
+    }
+
+    // 3. Project config: <repo>/.agents/config.json
+    fs.mkdirSync(path.join(tmpDir, '.agents'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, '.agents', 'config.json'), JSON.stringify({
+      remoteBaselineUrl: 'https://project-cfg.example.com/baseline.yml'
+    }));
+    const projRes = resolveRemoteBaselineUrl({}, tmpDir, path.join(tmpDir, 'nonexistent-home'));
+    assert.equal(projRes, 'https://project-cfg.example.com/baseline.yml');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('14. fetchRemotePolicy reads YAML, handles local cache fallback, and mergePolicies combines rules', async () => {
+  const { fetchRemotePolicy, mergePolicies } = await import('../src/lib/remote-policy.mjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fetch-remote-test-'));
+
+  try {
+    const cacheDir = path.join(tmpDir, 'cache');
+    const cachedFile = path.join(cacheDir, 'company-remote-baseline.yml');
+    fs.mkdirSync(cacheDir, { recursive: true });
+
+    // Seed cache with valid company policy
+    const sampleYaml = [
+      'name: corporate-security-baseline',
+      'allow:',
+      '  - "Bash(git fetch:*)"',
+      '  - "Bash(docker compose ps)"',
+      'deny:',
+      '  - "Bash(curl -s * | bash)"',
+      '  - "Bash(nc -e *:*)"'
+    ].join('\n');
+    fs.writeFileSync(cachedFile, sampleYaml, 'utf8');
+
+    // Fetch from invalid URL will fallback to local cache
+    const fetched = await fetchRemotePolicy('https://offline.invalid.nonexistent/policy.yml', cacheDir);
+    assert.equal(fetched.name, 'corporate-security-baseline');
+    assert.equal(fetched.fromCache, true);
+    assert.ok(fetched.allow.includes('Bash(git fetch:*)'));
+    assert.ok(fetched.deny.includes('Bash(curl -s * | bash)'));
+
+    // Merge with existing local policy
+    const local = {
+      name: 'local',
+      allow: ['Bash(git status:*)'],
+      deny: ['Bash(sudo:*)'],
+      files: ['local.yml']
+    };
+    const merged = mergePolicies(local, fetched);
+    assert.ok(merged.allow.includes('Bash(git status:*)'));
+    assert.ok(merged.allow.includes('Bash(git fetch:*)'));
+    assert.ok(merged.deny.includes('Bash(sudo:*)'));
+    assert.ok(merged.deny.includes('Bash(curl -s * | bash)'));
+    assert.ok(merged.files.some(f => f.includes('corporate-security-baseline')));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('15. installSessionStartHook and installGitHook configure auto-sync compliance gates', async () => {
+  const { installSessionStartHook, installGitHook } = await import('../src/lib/remote-policy.mjs');
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hooks-test-'));
+
+  try {
+    // 1. Test SessionStart hook installation in project
+    const res1 = installSessionStartHook({ global: false, projectRoot: tmpDir, homeDir: tmpDir });
+    assert.equal(res1.updated, true);
+
+    const settings1 = JSON.parse(fs.readFileSync(res1.targetFile, 'utf8'));
+    assert.ok(Array.isArray(settings1.hooks.SessionStart));
+    assert.ok(settings1.hooks.SessionStart.some(h => h.command.includes('agent-cli-permissions sync')));
+
+    // Idempotent: running again does not duplicate hook
+    const res2 = installSessionStartHook({ global: false, projectRoot: tmpDir, homeDir: tmpDir });
+    assert.equal(res2.updated, false);
+    const settings2 = JSON.parse(fs.readFileSync(res2.targetFile, 'utf8'));
+    assert.equal(settings2.hooks.SessionStart.length, 1);
+
+    // 2. Test Git hook installation
+    fs.mkdirSync(path.join(tmpDir, '.git'), { recursive: true });
+    const gitRes = installGitHook(tmpDir, 'pre-commit');
+    assert.equal(gitRes.ok, true);
+    assert.equal(gitRes.updated, true);
+
+    const hookContent = fs.readFileSync(gitRes.hookFile, 'utf8');
+    assert.ok(hookContent.includes('agent-cli-permissions check'));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});

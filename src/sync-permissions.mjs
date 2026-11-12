@@ -56,8 +56,23 @@ export {
   syncGitignore
 } from './lib/gitignore.mjs';
 
+export {
+  resolveRemoteBaselineUrl,
+  fetchRemotePolicy,
+  mergePolicies,
+  installSessionStartHook,
+  installGitHook
+} from './lib/remote-policy.mjs';
+
 import { parsePolicyYaml } from './lib/parser.mjs';
 import { loadPolicyDirectory, verifyNoDenyWeakening } from './lib/validator.mjs';
+import {
+  resolveRemoteBaselineUrl,
+  fetchRemotePolicy,
+  mergePolicies,
+  installSessionStartHook,
+  installGitHook
+} from './lib/remote-policy.mjs';
 import {
   compileCodexRules,
   compileClaudePermissions,
@@ -273,6 +288,22 @@ export async function main(args = process.argv.slice(2)) {
   const baselineDir = path.join(homeDir, '.agents', 'permissions');
   const projectPermsDir = path.join(projectRoot, '.agents', 'permissions');
 
+  // Handle 'install-hooks' mode
+  if (args.includes('install-hooks')) {
+    const isGlobal = args.includes('--global') || !args.includes('--project');
+    const res = installSessionStartHook({ global: isGlobal, projectRoot, homeDir });
+    console.log(`[Hooks Installer] ${res.updated ? 'Configured' : 'Already active'}: SessionStart auto-sync hook in ${res.targetFile}`);
+    return;
+  }
+
+  // Handle 'install-git-hook' mode
+  if (args.includes('install-git-hook')) {
+    const hookType = args.find(a => ['pre-commit', 'post-checkout', 'pre-push'].includes(a)) || 'pre-commit';
+    const res = installGitHook(projectRoot, hookType);
+    console.log(`[Git Hook Installer] ${res.message}`);
+    return;
+  }
+
   // Handle 'list' mode
   if (args.includes('list') || args.includes('--list')) {
     listPermissions(baselineDir, projectPermsDir);
@@ -288,17 +319,42 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   const isCheckMode = args.includes('--check') || args.includes('check');
+  const isSilent = args.includes('--silent') || args.includes('-s');
+  const log = (...msg) => { if (!isSilent) console.log(...msg); };
+  const warn = (...msg) => { if (!isSilent) console.warn(...msg); };
 
-  console.log(`[Permission Sync] Running in ${isCheckMode ? 'CHECK' : 'SYNC'} mode...`);
-  console.log(`[Permission Sync] Project root: ${projectRoot}`);
+  log(`[Permission Sync] Running in ${isCheckMode ? 'CHECK' : 'SYNC'} mode...`);
+  log(`[Permission Sync] Project root: ${projectRoot}`);
 
-  console.log(`[Permission Sync] Loading company baseline from ${baselineDir}...`);
-  const baselinePolicy = loadPolicyDirectory(baselineDir);
-  console.log(`[Permission Sync] Loaded baseline: ${baselinePolicy.allow.length} allow, ${baselinePolicy.deny.length} deny rules from [${baselinePolicy.files.join(', ')}]`);
+  // 1. Load baseline policy (local directory + optional remote company webpage/URL)
+  const remoteIdx = args.findIndex(a => a === '--remote' || a === '--remote-url');
+  const cliRemoteUrl = remoteIdx !== -1 ? args[remoteIdx + 1] : null;
+  const remoteUrl = resolveRemoteBaselineUrl({ remoteUrl: cliRemoteUrl }, projectRoot, homeDir);
 
-  console.log(`[Permission Sync] Loading project policy from ${projectPermsDir}...`);
+  log(`[Permission Sync] Loading company baseline from ${baselineDir}...`);
+  let baselinePolicy = loadPolicyDirectory(baselineDir);
+
+  if (remoteUrl) {
+    log(`[Permission Sync] Fetching remote company policy from ${remoteUrl}...`);
+    try {
+      const remotePolicy = await fetchRemotePolicy(remoteUrl);
+      log(`[Permission Sync] Loaded remote baseline: ${remotePolicy.allow.length} allow, ${remotePolicy.deny.length} deny rules${remotePolicy.fromCache ? ' (from local cache)' : ''}`);
+      baselinePolicy = mergePolicies(baselinePolicy, remotePolicy);
+    } catch (err) {
+      if (isCheckMode) {
+        console.error(`[ERROR] Failed to fetch remote company policy: ${err.message}`);
+        process.exit(1);
+      } else {
+        warn(`[WARNING] Remote company policy unavailable (${err.message}). Proceeding with local baseline.`);
+      }
+    }
+  }
+
+  log(`[Permission Sync] Loaded baseline: ${baselinePolicy.allow.length} allow, ${baselinePolicy.deny.length} deny rules from [${baselinePolicy.files.join(', ')}]`);
+
+  log(`[Permission Sync] Loading project policy from ${projectPermsDir}...`);
   const projectPolicy = loadPolicyDirectory(projectPermsDir);
-  console.log(`[Permission Sync] Loaded project: ${projectPolicy.allow.length} allow, ${projectPolicy.deny.length} deny rules from [${projectPolicy.files.join(', ')}]`);
+  log(`[Permission Sync] Loaded project: ${projectPolicy.allow.length} allow, ${projectPolicy.deny.length} deny rules from [${projectPolicy.files.join(', ')}]`);
 
   // 2. Validate security precedence (project cannot weaken baseline deny)
   verifyNoDenyWeakening(baselinePolicy, projectPolicy);

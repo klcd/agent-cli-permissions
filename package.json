@@ -11,7 +11,8 @@
     "bin",
     "src",
     "orca-plugin",
-    "tests"
+    "tests",
+    "install.sh"
   ],
   "engines": {
     "node": ">=18.0.0"
