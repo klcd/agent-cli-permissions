@@ -23,3 +23,14 @@ agent-permissions-view set:
 test:
     @node --test tests/permissions.test.mjs
 
+
+# Build, validate, and test the Orca CLI Permissions plugin
+orca-plugin-check:
+    @bun scripts/build-orca-panel.mjs
+    @orca plugin check orca-plugin --json
+    @orca plugin test orca-plugin --json
+
+# Install the Orca CLI Permissions plugin into Orca
+orca-plugin-install:
+    @bun scripts/build-orca-panel.mjs
+    @orca plugin install "$(pwd)/orca-plugin" --json

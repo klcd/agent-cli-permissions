@@ -1,0 +1,30 @@
+{
+  "manifestVersion": 2,
+  "id": "agent-permissions",
+  "name": "Agent CLI Permissions",
+  "version": "0.1.0",
+  "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules to Claude Code, Codex, and Antigravity.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "cli-permissions",
+        "title": "CLI Permissions",
+        "icon": "terminal",
+        "entry": "panel/index.html"
+      }
+    ],
+    "commands": [
+      {
+        "id": "agentPermissions.sync",
+        "title": "Agent Permissions: Sync Canonical YAML Rules"
+      }
+    ]
+  },
+  "capabilities": []
+}
