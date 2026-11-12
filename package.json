@@ -1,9 +1,10 @@
 {
-  "name": "agent-permissions",
+  "name": "agent-cli-permissions",
   "version": "0.1.0",
   "description": "Unified Coding-Agent Permission Synchronizer & CLI",
   "type": "module",
   "bin": {
+    "agent-cli-permissions": "./bin/agent-permissions.mjs",
     "agent-permissions": "./bin/agent-permissions.mjs"
   },
   "files": [
@@ -24,6 +25,14 @@
     "orca:check": "node bin/agent-permissions.mjs orca check",
     "orca:install": "node bin/agent-permissions.mjs orca install"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klcd/agent-cli-permissions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/klcd/agent-cli-permissions/issues"
+  },
+  "homepage": "https://github.com/klcd/agent-cli-permissions#readme",
   "keywords": [
     "agents",
     "permissions",
@@ -32,5 +41,5 @@
     "antigravity",
     "orca"
   ],
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
