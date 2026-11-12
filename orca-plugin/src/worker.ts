@@ -17,11 +17,13 @@ export function syncCanonicalPermissions(
 ): { ok: boolean; message: string } {
   const workerDir = path.dirname(fileURLToPath(import.meta.url))
   const repoRoot = path.resolve(workerDir, '..', '..')
-  const repoSyncScript = path.join(repoRoot, 'scripts', 'sync-permissions.mjs')
+  const repoSyncScript = path.join(repoRoot, 'src', 'sync-permissions.mjs')
+  const repoBinScript = path.join(repoRoot, 'bin', 'agent-permissions.mjs')
   const candidates = [
     path.join(homeDir, '.local', 'bin', 'sync-agent-permissions'),
     path.join(homeDir, '.agents', 'bin', 'sync-agent-permissions'),
     path.join(homeDir, '.agents', 'scripts', 'sync-agent-permissions.sh'),
+    repoBinScript,
     repoSyncScript,
   ]
   const syncBin = candidates.find(p => fs.existsSync(p))

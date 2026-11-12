@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { main as syncMain } from '../scripts/sync-permissions.mjs';
+import { main as syncMain } from '../src/sync-permissions.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,7 +101,7 @@ async function run() {
 
     case 'orca': {
       const sub = args[1];
-      const panelScript = path.join(rootDir, 'scripts', 'build-orca-panel.mjs');
+      const panelScript = path.join(rootDir, 'src', 'build-orca-panel.mjs');
       const pluginDir = path.join(rootDir, 'orca-plugin');
 
       if (sub === 'check') {

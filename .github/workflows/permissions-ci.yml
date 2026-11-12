@@ -21,10 +21,10 @@ jobs:
           node-version: 22
 
       - name: Synchronize Native Configurations
-        run: node scripts/sync-permissions.mjs
+        run: node src/sync-permissions.mjs
 
       - name: Verify Configurations Are In Sync & Idempotent
-        run: node scripts/sync-permissions.mjs --check
+        run: node src/sync-permissions.mjs --check
 
       - name: Run Deterministic Policy Test Suite
         run: node --test tests/permissions.test.mjs

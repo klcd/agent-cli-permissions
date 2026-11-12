@@ -12,7 +12,7 @@ import {
   compileClaudePermissions,
   compileAntigravityPermissions,
   checkCodexPolicy,
-} from '../scripts/sync-permissions.mjs';
+} from '../src/sync-permissions.mjs';
 
 test('1. Canonical rule parsing works for valid tools and patterns', () => {
   const r1 = parseCanonicalRule('Bash(git status:*)');
@@ -232,9 +232,9 @@ test('7. Unauthorized executor wrapping is not permitted', () => {
 });
 
 test('8. Modular components in lib/*.mjs can be imported directly', async () => {
-  const parser = await import('../scripts/lib/parser.mjs');
-  const validator = await import('../scripts/lib/validator.mjs');
-  const compilers = await import('../scripts/lib/compilers.mjs');
+  const parser = await import('../src/lib/parser.mjs');
+  const validator = await import('../src/lib/validator.mjs');
+  const compilers = await import('../src/lib/compilers.mjs');
 
   assert.equal(typeof parser.parsePolicyYaml, 'function');
   assert.equal(typeof parser.parseCanonicalRule, 'function');
@@ -257,7 +257,7 @@ test('9. Compilers for common other agents (Cursor, OpenCode, Grok, Kimi, Droid)
     compileGrokPermissions,
     compileKimiPermissions,
     compileDroidPermissions,
-  } = await import('../scripts/lib/compilers.mjs');
+  } = await import('../src/lib/compilers.mjs');
 
   const policy = {
     allow: ['Bash(git status:*)', 'Bash(pwd)', 'WebSearch(docs)'],
@@ -300,7 +300,7 @@ test('10. Agents reading .agents natively are skipped from redundant compilation
   const {
     AGENTS_READING_CANONICAL_DIRECTLY,
     requiresNativeCompiler
-  } = await import('../scripts/lib/compilers.mjs');
+  } = await import('../src/lib/compilers.mjs');
 
   assert.equal(requiresNativeCompiler('claude'), true);
   assert.equal(requiresNativeCompiler('codex'), true);
@@ -317,7 +317,7 @@ test('10. Agents reading .agents natively are skipped from redundant compilation
 });
 
 test('11. isPurePermissionsFile distinguishes pure permissions from files with hooks/MCP', async () => {
-  const { isPurePermissionsFile } = await import('../scripts/lib/gitignore.mjs');
+  const { isPurePermissionsFile } = await import('../src/lib/gitignore.mjs');
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pure-perm-test-'));
 
   try {
@@ -355,7 +355,7 @@ test('11. isPurePermissionsFile distinguishes pure permissions from files with h
 });
 
 test('12. syncGitignore never ignores whole directories and excludes files with other configs', async () => {
-  const { syncGitignore, getExpectedGitignoreEntries } = await import('../scripts/lib/gitignore.mjs');
+  const { syncGitignore, getExpectedGitignoreEntries } = await import('../src/lib/gitignore.mjs');
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitignore-test-'));
 
   try {
