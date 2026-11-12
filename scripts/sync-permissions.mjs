@@ -4,7 +4,60 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import yaml from 'yaml';
+
+/**
+ * Lightweight, zero-dependency YAML parser for canonical agent permissions
+ */
+export function parsePolicyYaml(text) {
+  const result = { allow: [], deny: [], ask: [] };
+  const lines = text.split(/\r?\n/);
+  let currentKey = null;
+
+  for (let line of lines) {
+    // Strip comments unless inside quotes
+    const commentIdx = line.indexOf('#');
+    if (commentIdx !== -1) {
+      const before = line.slice(0, commentIdx);
+      const singleQuotes = (before.match(/'/g) || []).length;
+      const doubleQuotes = (before.match(/"/g) || []).length;
+      if (singleQuotes % 2 === 0 && doubleQuotes % 2 === 0) {
+        line = before;
+      }
+    }
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check for top-level scalar keys: "key: value" or list starts: "key:"
+    const topMatch = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+    if (topMatch) {
+      const key = topMatch[1];
+      const val = topMatch[2].trim();
+      if (key === 'allow' || key === 'deny' || key === 'ask') {
+        currentKey = key;
+        continue;
+      } else {
+        currentKey = null;
+        let unquoted = val;
+        if ((unquoted.startsWith('"') && unquoted.endsWith('"')) || (unquoted.startsWith("'") && unquoted.endsWith("'"))) {
+          unquoted = unquoted.slice(1, -1);
+        }
+        result[key] = unquoted;
+        continue;
+      }
+    }
+
+    // Check for list item: "  - value"
+    const itemMatch = line.match(/^\s*-\s+(.*)$/);
+    if (itemMatch && currentKey) {
+      let item = itemMatch[1].trim();
+      if ((item.startsWith('"') && item.endsWith('"')) || (item.startsWith("'") && item.endsWith("'"))) {
+        item = item.slice(1, -1);
+      }
+      result[currentKey].push(item);
+    }
+  }
+  return result;
+}
 
 // Blanket arbitrary code executors and sensitive tools that must never be broadly allowed
 export const FORBIDDEN_BLANKET_EXECUTORS = new Set([
@@ -86,7 +139,7 @@ export function loadPolicyDirectory(dirPath) {
 
     const fullPath = path.join(dirPath, entry.name);
     const content = fs.readFileSync(fullPath, 'utf8');
-    const parsed = yaml.parse(content);
+    const parsed = parsePolicyYaml(content);
     if (!parsed) continue;
 
     validatePermissionSet(parsed, fullPath);
@@ -324,7 +377,7 @@ export function listPermissions(baselineDir, projectPermsDir) {
       if (!entry.isFile() || (!entry.name.endsWith('.yml') && !entry.name.endsWith('.yaml'))) continue;
       const fullPath = path.join(dirPath, entry.name);
       try {
-        const parsed = yaml.parse(fs.readFileSync(fullPath, 'utf8'));
+        const parsed = parsePolicyYaml(fs.readFileSync(fullPath, 'utf8'));
         const name = parsed?.name || path.basename(entry.name, path.extname(entry.name));
         const desc = parsed?.description ? ` - ${parsed.description}` : '';
         const allowCount = Array.isArray(parsed?.allow) ? parsed.allow.length : 0;
@@ -368,7 +421,7 @@ export function viewPermissionSet(setName, baselineDir, projectPermsDir) {
       if (!e.isFile() || (!e.name.endsWith('.yml') && !e.name.endsWith('.yaml'))) continue;
       const p = path.join(d, e.name);
       try {
-        const parsed = yaml.parse(fs.readFileSync(p, 'utf8'));
+        const parsed = parsePolicyYaml(fs.readFileSync(p, 'utf8'));
         const name = parsed?.name || path.basename(e.name, path.extname(e.name));
         if (name === setName || e.name === setName || e.name === `${setName}.yml` || e.name === `${setName}.yaml`) {
           found = parsed;

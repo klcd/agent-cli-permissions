@@ -20,9 +20,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Dependencies
-        run: npm install
-
       - name: Synchronize Native Configurations
         run: node scripts/sync-permissions.mjs
 
