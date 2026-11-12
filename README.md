@@ -6,27 +6,50 @@ A single canonical permission configuration system for coding agents (`claude`, 
 
 Developers run their native agent tools directly without wrappers or runtime proxies:
 
-```text
-                               canonical policy
+```mermaid
+flowchart TD
+    subgraph CanonicalPolicy ["Canonical Policy (Source of Truth)"]
+        Baseline["Company-wide Baseline: ~/.agents/permissions/"]
+        Project["Project Policy: repo/.agents/permissions/"]
+    end
 
-                  company-wide                 project
-           ~/.agents/permissions/      <repo>/.agents/permissions/
-                         \                    /
-                          \                  /
-                           +----------------+
-                                    |
-                           permission compiler
-                     (zero-dependency vanilla Node.js)
-                                    |
-       +------------+------------+--+---------+------------+
-       |            |            |            |            |
-       v            v            v            v            v
-     Claude       Codex      Antigravity    Cursor      OpenCode
-     native       native       native       native       native
-     config       rules        config       config       config
+    Compiler["Permission Synchronizer & Compiler\n(Zero-dependency Node.js)"]
+
+    Baseline --> Compiler
+    Project --> Compiler
+
+    subgraph NativeTargets ["Native Agent Targets (Generated Artifacts)"]
+        Claude["Claude Code\n(.claude/settings.json)"]
+        Codex["Codex Rules\n(.codex/rules/*.rules)"]
+        Antigravity["Antigravity\n(.gemini/settings.json)"]
+        Cursor["Cursor CLI\n(.cursor/cli-config.json)"]
+        OpenCode["OpenCode\n(opencode.json)"]
+        Others["Grok, Kimi, Droid\n(Native Configs)"]
+    end
+
+    Compiler --> Claude
+    Compiler --> Codex
+    Compiler --> Antigravity
+    Compiler --> Cursor
+    Compiler --> OpenCode
+    Compiler --> Others
 ```
 
-### Precedence & Layering
+### Precedence & Evaluation
+
+The effective policy evaluation strictly enforces `DENY > PROMPT/ASK > ALLOW`:
+
+```mermaid
+flowchart TD
+    Command["Agent Command Invocation"] --> CheckDeny{"Matches Baseline or Project Deny?"}
+    CheckDeny -- "Yes" --> Denied["FORBIDDEN / DENIED\n(Hard Security Block)"]
+    CheckDeny -- "No" --> CheckPrompt{"Matches Prompt / Ask?"}
+    CheckPrompt -- "Yes" --> Prompt["PROMPT / ASK\n(Requires Interactive Approval)"]
+    CheckPrompt -- "No" --> CheckAllow{"Matches Allowed Patterns?"}
+    CheckAllow -- "Yes" --> Allowed["ALLOW\n(Permitted Execution)"]
+    CheckAllow -- "No" --> Fallback["FALLBACK ACTION\n(Default Deny / Prompt)"]
+```
+
 1. **Layering**: Organization baseline (`~/.agents/permissions/`) establishes the minimum security boundary. Project policy (`<repo>/.agents/permissions/`) extends baseline rules for repo-specific workflows.
 2. **Precedence**: `DENY > PROMPT/ASK > ALLOW`. A project rule cannot weaken or contradict a mandatory deny from the baseline.
 3. **Execution Guards**: Blanket allow for arbitrary executors (`bash`, `python`, `node`, `docker`, etc.) is strictly forbidden. Rules must use scoped subcommands and patterns (`git status:*`, `docker ps:*`).

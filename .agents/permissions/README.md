@@ -4,29 +4,38 @@ This directory contains the canonical command and tool permissions for AI coding
 
 ## Architecture
 
-```text
-                    company policy
-                ~/.agents/permissions/
-               ├── security-baseline.yml
-               ├── git.yml
-               └── inspection.yml
-                          |
-                          +
-                          |
-             project/.agents/permissions/
-               ├── project.yml
-               └── development.yml
-                          |
-                          v
-                 permission compiler
-              (just agent-permissions-sync)
-                          |
-              +-----------+-----------+
-              |           |           |
-              v           v           v
-           Claude       Codex     Antigravity
-           native       native      native
-           config       rules       config
+```mermaid
+flowchart TD
+    subgraph CompanyPolicy ["Company Baseline (~/.agents/permissions/)"]
+        SecBase["security-baseline.yml"]
+        GitRules["git.yml"]
+        InspectRules["inspection.yml"]
+        InfraRules["infrastructure.yml"]
+    end
+
+    subgraph ProjectPolicy ["Project Policy (repo/.agents/permissions/)"]
+        ProjRules["project.yml"]
+        DevRules["development.yml"]
+    end
+
+    Compiler["Permission Compiler\n(just agent-permissions-sync)"]
+
+    CompanyPolicy --> Compiler
+    ProjectPolicy --> Compiler
+
+    subgraph NativeTargets ["Native Agent Configs (Direct Native Invocation)"]
+        Claude["Claude Code\n(.claude/settings.json)"]
+        Codex["Codex Rules\n(.codex/rules/*.rules)"]
+        Antigravity["Antigravity\n(.gemini/settings.json)"]
+        Cursor["Cursor CLI\n(.cursor/cli-config.json)"]
+        OpenCode["OpenCode\n(opencode.json)"]
+    end
+
+    Compiler --> Claude
+    Compiler --> Codex
+    Compiler --> Antigravity
+    Compiler --> Cursor
+    Compiler --> OpenCode
 ```
 
 Developers continue to invoke their native agent CLIs directly:
@@ -58,8 +67,10 @@ Permissions are structured in two layers:
 2. **Project Policy (`<repo>/.agents/permissions/`):** Supplements the organization baseline with commands specific to this repository.
 
 ### Precedence Model
-```text
-DENY > PROMPT/ASK > ALLOW
+
+```mermaid
+flowchart LR
+    Deny["DENY\n(Highest Precedence)"] --> Ask["PROMPT / ASK\n(Requires Confirmation)"] --> Allow["ALLOW\n(Permitted)"]
 ```
 
 - A project rule **cannot** weaken, override, or circumvent a baseline `deny`.
