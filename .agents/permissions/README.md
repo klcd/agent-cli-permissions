@@ -109,8 +109,8 @@ flowchart LR
 To compile canonical permissions into vendor-native files:
 
 ```bash
-./bin/agent-permissions sync
-# or: npm run sync
+npx agent-permissions sync
+# or: npx . sync, npm run sync, ./bin/agent-permissions sync
 ```
 
 This command:
@@ -130,8 +130,8 @@ Synchronization is strictly **deterministic** and **idempotent**. Running the sy
 To verify permissions without mutating any files:
 
 ```bash
-./bin/agent-permissions check
-# or: npm run check
+npx agent-permissions check
+# or: npx . check, npm run check
 ```
 
 This command checks for configuration drift between `.agents/permissions/` and native generated files, returning exit code `0` if in sync and `1` if drift is detected.
@@ -139,24 +139,24 @@ This command checks for configuration drift between `.agents/permissions/` and n
 To list all active permission sets across baseline and project scopes:
 
 ```bash
-./bin/agent-permissions list
-# or: npm run list
+npx agent-permissions list
+# or: npx . list, npm run list
 ```
 
 To view details and all allow/deny rules of a specific permission set:
 
 ```bash
-./bin/agent-permissions view <set-name>
+npx agent-permissions view <set-name>
 # Examples:
-# ./bin/agent-permissions view project
-# ./bin/agent-permissions view security-baseline
-# ./bin/agent-permissions view infrastructure
+# npx agent-permissions view project
+# npx agent-permissions view security-baseline
+# npx agent-permissions view infrastructure
 ```
 
 To run the automated policy test suite:
 
 ```bash
-./bin/agent-permissions test
+npx agent-permissions test
 # or: npm test
 ```
 

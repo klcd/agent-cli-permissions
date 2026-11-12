@@ -76,32 +76,32 @@ flowchart TD
 
 ## Commands
 
-The repository provides a zero-dependency CLI at [`bin/agent-permissions`](file:///Users/cedric/Projects/AgenticCoding/permission-setup/bin/agent-permissions) (also exposed via `package.json` and standard `npm` scripts):
+The repository provides a zero-dependency CLI executable via **`npx`**, standard **`npm`** scripts, or directly at [`bin/agent-permissions`](file:///Users/cedric/Projects/AgenticCoding/permission-setup/bin/agent-permissions):
 
 ```bash
 # Synchronize canonical rules into all native agent formats
-./bin/agent-permissions sync
-# or: npm run sync
+npx agent-permissions sync
+# or: npx . sync, npm run sync, ./bin/agent-permissions sync
 
 # Verify zero drift between canonical rules and generated targets
-./bin/agent-permissions check
-# or: npm run check
+npx agent-permissions check
+# or: npx . check, npm run check
 
 # List all installed permission sets across baseline and project
-./bin/agent-permissions list
-# or: npm run list
+npx agent-permissions list
+# or: npx . list, npm run list
 
 # View full allow/deny rules for a specific set
-./bin/agent-permissions view security-baseline
-./bin/agent-permissions view project
+npx agent-permissions view security-baseline
+npx agent-permissions view project
 
 # Run the complete test suite (syntax, security, execpolicy assertions)
-./bin/agent-permissions test
+npx agent-permissions test
 # or: npm test
 
 # Orca Plugin tasks
-./bin/agent-permissions orca check      # Build panel, validate manifest, run plugin tests
-./bin/agent-permissions orca install    # Build panel and install plugin into local Orca
+npx agent-permissions orca check      # Build panel, validate manifest, run plugin tests
+npx agent-permissions orca install    # Build panel and install plugin into local Orca
 ```
 
 ---

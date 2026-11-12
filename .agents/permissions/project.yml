@@ -2,6 +2,10 @@ name: project
 description: Project-specific permissions for permission-setup repository with argument patterns
 allow:
   # CLI & task execution
+  - "Bash(npx agent-permissions)"
+  - "Bash(npx agent-permissions:*)"
+  - "Bash(npx .)"
+  - "Bash(npx .:*)"
   - "Bash(agent-permissions)"
   - "Bash(agent-permissions:*)"
   - "Bash(./bin/agent-permissions)"

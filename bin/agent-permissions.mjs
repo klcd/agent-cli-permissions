@@ -7,6 +7,7 @@
  * compile configurations, execute test suites, and manage the Orca plugin.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -24,7 +25,8 @@ function printHelp() {
 agent-permissions - Unified Coding-Agent Permission Manager & CLI
 
 Usage:
-  agent-permissions <command> [options]
+  npx agent-permissions <command> [options]
+  or: ./bin/agent-permissions <command> [options]
 
 Commands:
   sync                     Compile & synchronize canonical rules to all agent configs
@@ -37,12 +39,12 @@ Commands:
   help, --help, -h         Show this help message
 
 Examples:
-  agent-permissions sync
-  agent-permissions check
-  agent-permissions list
-  agent-permissions view project
-  agent-permissions test
-  agent-permissions orca check
+  npx agent-permissions sync
+  npx agent-permissions check
+  npx agent-permissions list
+  npx agent-permissions view project
+  npx agent-permissions test
+  npx agent-permissions orca check
 `);
 }
 
@@ -82,10 +84,13 @@ async function run() {
     }
 
     case 'test': {
-      console.log('[Test Runner] Running Node.js test suite: tests/permissions.test.mjs...');
+      console.log('[Test Runner] Running Node.js test suite...');
       try {
-        execFileSync(process.execPath, ['--test', path.join(rootDir, 'tests', 'permissions.test.mjs')], {
-          cwd: rootDir,
+        const localTest = path.join(process.cwd(), 'tests', 'permissions.test.mjs');
+        const packageTest = path.join(rootDir, 'tests', 'permissions.test.mjs');
+        const testFile = fs.existsSync(localTest) ? localTest : packageTest;
+        execFileSync(process.execPath, ['--test', testFile], {
+          cwd: process.cwd(),
           stdio: 'inherit',
         });
       } catch (err) {

@@ -6,6 +6,15 @@
   "bin": {
     "agent-permissions": "./bin/agent-permissions.mjs"
   },
+  "files": [
+    "bin",
+    "scripts",
+    "orca-plugin",
+    "tests"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "sync": "node bin/agent-permissions.mjs sync",
     "check": "node bin/agent-permissions.mjs check",

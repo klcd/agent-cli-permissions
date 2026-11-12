@@ -448,6 +448,8 @@ export async function main(args = process.argv.slice(2)) {
     { cmd: ['terraform', 'validate'], expected: 'allow', desc: 'Infrastructure allow: terraform validate' },
     { cmd: ['agent-permissions', 'test'], expected: 'allow', desc: 'Project allow: agent-permissions test' },
     { cmd: ['agent-permissions', 'check'], expected: 'allow', desc: 'Project pattern: agent-permissions check' },
+    { cmd: ['npx', 'agent-permissions', 'test'], expected: 'allow', desc: 'Project pattern: npx agent-permissions test' },
+    { cmd: ['npx', '.', 'test'], expected: 'allow', desc: 'Project pattern: npx . test' },
     { cmd: ['./bin/agent-permissions', 'test'], expected: 'allow', desc: 'Project pattern: ./bin/agent-permissions test' },
     { cmd: ['node', '--test'], expected: 'allow', desc: 'Project allow: node --test' },
     { cmd: ['git', 'add', '-A'], expected: 'allow', desc: 'Project pattern: git add -A' },
