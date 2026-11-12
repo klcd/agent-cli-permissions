@@ -1,7 +1,13 @@
 .DS_Store
 *.tmp
 
-# Generated native agent configuration folders (local artifacts)
+# Generated native agent configuration folders and files (local artifacts)
 .claude/
 .codex/
 .gemini/
+.cursor/
+opencode.json
+opencode.jsonc
+.grok/
+.kimi-code/
+.factory/

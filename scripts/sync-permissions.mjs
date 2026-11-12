@@ -7,10 +7,14 @@
  *   - Codex execpolicy (.codex/rules/*.rules)
  *   - Claude permissions (.claude/settings.json)
  *   - Antigravity permissions (.gemini/settings.json)
+ *   - Cursor permissions (.cursor/cli-config.json)
+ *   - OpenCode permissions (opencode.json)
+ *   - Grok permissions (.grok/config.json)
+ *   - Kimi permissions (.kimi-code/config.toml)
+ *   - Droid permissions (.factory/settings.json)
  *
- * Supports two policy layers:
- *   1. Company / Baseline (~/.agents/permissions/)
- *   2. Project-Specific (<repo>/.agents/permissions/)
+ * Agents that natively read from .agents/ are identified via requiresNativeCompiler()
+ * and skipped from redundant compilation.
  *
  * Zero external npm dependencies (pure standard Node.js ES module).
  */
@@ -36,7 +40,14 @@ export {
 export {
   compileCodexRules,
   compileClaudePermissions,
-  compileAntigravityPermissions
+  compileAntigravityPermissions,
+  compileCursorPermissions,
+  compileOpenCodePermissions,
+  compileGrokPermissions,
+  compileKimiPermissions,
+  compileDroidPermissions,
+  AGENTS_READING_CANONICAL_DIRECTLY,
+  requiresNativeCompiler
 } from './lib/compilers.mjs';
 
 import { parsePolicyYaml } from './lib/parser.mjs';
@@ -44,7 +55,10 @@ import { loadPolicyDirectory, verifyNoDenyWeakening } from './lib/validator.mjs'
 import {
   compileCodexRules,
   compileClaudePermissions,
-  compileAntigravityPermissions
+  compileAntigravityPermissions,
+  compileCursorPermissions,
+  compileOpenCodePermissions,
+  requiresNativeCompiler
 } from './lib/compilers.mjs';
 
 /**
@@ -63,9 +77,19 @@ export function writeIfChanged(filePath, newContent) {
 }
 
 /**
- * Updates a JSON file with a new permissions block while preserving other keys
+ * Updates a JSON file with a new section block while preserving other keys
  */
-export function updateJsonPermissions(filePath, newPermissions, checkOnly = false) {
+export function updateJsonSection(filePath, keyName, newContent, checkOnly = false) {
+  // If filePath is a symlink pointing into /nix/store, skip writing to avoid EROFS
+  if (fs.existsSync(filePath)) {
+    try {
+      const real = fs.realpathSync(filePath);
+      if (real.startsWith('/nix/store/')) {
+        return { changed: false, missing: false, readOnly: true };
+      }
+    } catch {}
+  }
+
   let existingObj = {};
   if (fs.existsSync(filePath)) {
     try {
@@ -75,17 +99,24 @@ export function updateJsonPermissions(filePath, newPermissions, checkOnly = fals
     }
   }
 
-  const updatedObj = { ...existingObj, permissions: newPermissions };
+  const updatedObj = { ...existingObj, [keyName]: newContent };
   const formatted = JSON.stringify(updatedObj, null, 2) + '\n';
 
   if (checkOnly) {
-    if (!fs.existsSync(filePath)) return { changed: true, missing: true };
+    if (!fs.existsSync(filePath)) return { changed: true, missing: true, readOnly: false };
     const current = fs.readFileSync(filePath, 'utf8');
-    return { changed: current !== formatted, missing: false };
+    return { changed: current !== formatted, missing: false, readOnly: false };
   }
 
   const changed = writeIfChanged(filePath, formatted);
-  return { changed, missing: false };
+  return { changed, missing: false, readOnly: false };
+}
+
+/**
+ * Updates a JSON file with a new permissions block while preserving other keys (backward compatibility)
+ */
+export function updateJsonPermissions(filePath, newPermissions, checkOnly = false) {
+  return updateJsonSection(filePath, 'permissions', newPermissions, checkOnly);
 }
 
 /**
@@ -265,32 +296,54 @@ export async function main(args = process.argv.slice(2)) {
   // 3. Compile Codex rules
   const userCodexRules = compileCodexRules(baselinePolicy, '~/.agents/permissions/');
   const projectCodexRules = compileCodexRules(projectPolicy, '.agents/permissions/');
-
   const userCodexPath = path.join(homeDir, '.codex', 'rules', 'generated-agents-policy.rules');
   const projectCodexPath = path.join(projectRoot, '.codex', 'rules', 'generated-agents-policy.rules');
 
   // 4. Compile Claude permissions
   const userClaudePerms = compileClaudePermissions(baselinePolicy);
   const projectClaudePerms = compileClaudePermissions(projectPolicy);
-
   const userClaudePath = path.join(homeDir, '.claude', 'settings.json');
   const projectClaudePath = path.join(projectRoot, '.claude', 'settings.json');
 
   // 5. Compile Antigravity permissions
   const userAntigravityPerms = compileAntigravityPermissions(baselinePolicy);
   const projectAntigravityPerms = compileAntigravityPermissions(projectPolicy);
-
   const userAntigravityPath = path.join(homeDir, '.gemini', 'antigravity-cli', 'settings.json');
   const projectAntigravityPath = path.join(projectRoot, '.gemini', 'settings.json');
 
-  const fileActions = [
-    { target: 'Codex (User)', path: userCodexPath, type: 'text', content: userCodexRules },
-    { target: 'Codex (Project)', path: projectCodexPath, type: 'text', content: projectCodexRules },
-    { target: 'Claude (User)', path: userClaudePath, type: 'json', content: userClaudePerms },
-    { target: 'Claude (Project)', path: projectClaudePath, type: 'json', content: projectClaudePerms },
-    { target: 'Antigravity (User)', path: userAntigravityPath, type: 'json', content: userAntigravityPerms },
-    { target: 'Antigravity (Project)', path: projectAntigravityPath, type: 'json', content: projectAntigravityPerms },
+  // 6. Compile Cursor permissions (Shell syntax)
+  const userCursorPerms = compileCursorPermissions(baselinePolicy);
+  const projectCursorPerms = compileCursorPermissions(projectPolicy);
+  const userCursorPath = path.join(homeDir, '.cursor', 'cli-config.json');
+  const projectCursorPath = path.join(projectRoot, '.cursor', 'cli-config.json');
+
+  // 7. Compile OpenCode permissions (permission.bash)
+  const userOpenCodePerms = compileOpenCodePermissions(baselinePolicy).permission;
+  const projectOpenCodePerms = compileOpenCodePermissions(projectPolicy).permission;
+  const userOpenCodePath = path.join(homeDir, '.config', 'opencode', 'opencode.json');
+  const projectOpenCodePath = path.join(projectRoot, 'opencode.json');
+
+  const candidateActions = [
+    { agent: 'codex', target: 'Codex (User)', path: userCodexPath, type: 'text', content: userCodexRules },
+    { agent: 'codex', target: 'Codex (Project)', path: projectCodexPath, type: 'text', content: projectCodexRules },
+    { agent: 'claude', target: 'Claude (User)', path: userClaudePath, type: 'json-permissions', content: userClaudePerms },
+    { agent: 'claude', target: 'Claude (Project)', path: projectClaudePath, type: 'json-permissions', content: projectClaudePerms },
+    { agent: 'antigravity', target: 'Antigravity (User)', path: userAntigravityPath, type: 'json-permissions', content: userAntigravityPerms },
+    { agent: 'antigravity', target: 'Antigravity (Project)', path: projectAntigravityPath, type: 'json-permissions', content: projectAntigravityPerms },
+    { agent: 'cursor', target: 'Cursor (User)', path: userCursorPath, type: 'json-permissions', content: userCursorPerms },
+    { agent: 'cursor', target: 'Cursor (Project)', path: projectCursorPath, type: 'json-permissions', content: projectCursorPerms },
+    { agent: 'opencode', target: 'OpenCode (User)', path: userOpenCodePath, type: 'json-permission', content: userOpenCodePerms },
+    { agent: 'opencode', target: 'OpenCode (Project)', path: projectOpenCodePath, type: 'json-permission', content: projectOpenCodePerms },
   ];
+
+  // Filter out agents that read canonical .agents natively
+  const fileActions = candidateActions.filter(item => {
+    if (!requiresNativeCompiler(item.agent)) {
+      console.log(`  [SKIPPED] ${item.target}: Agent '${item.agent}' natively reads from .agents/`);
+      return false;
+    }
+    return true;
+  });
 
   let driftedCount = 0;
 
@@ -306,9 +359,15 @@ export async function main(args = process.argv.slice(2)) {
           isDrifted = true;
           console.error(`  [DRIFT] Out of sync: ${item.path} (${item.target})`);
         }
-      } else if (item.type === 'json') {
-        const res = updateJsonPermissions(item.path, item.content, true);
-        if (res.changed) {
+      } else if (item.type === 'json-permissions') {
+        const res = updateJsonSection(item.path, 'permissions', item.content, true);
+        if (res.changed && !res.readOnly) {
+          isDrifted = true;
+          console.error(`  [DRIFT] Out of sync: ${item.path} (${item.target})`);
+        }
+      } else if (item.type === 'json-permission') {
+        const res = updateJsonSection(item.path, 'permission', item.content, true);
+        if (res.changed && !res.readOnly) {
           isDrifted = true;
           console.error(`  [DRIFT] Out of sync: ${item.path} (${item.target})`);
         }
@@ -318,11 +377,22 @@ export async function main(args = process.argv.slice(2)) {
       let changed = false;
       if (item.type === 'text') {
         changed = writeIfChanged(item.path, item.content);
-      } else if (item.type === 'json') {
-        const res = updateJsonPermissions(item.path, item.content, false);
-        changed = res.changed;
+        console.log(`  [${changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
+      } else if (item.type === 'json-permissions') {
+        const res = updateJsonSection(item.path, 'permissions', item.content, false);
+        if (res.readOnly) {
+          console.log(`  [READ-ONLY (SKIPPED)] ${item.target} -> ${item.path} (managed externally)`);
+        } else {
+          console.log(`  [${res.changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
+        }
+      } else if (item.type === 'json-permission') {
+        const res = updateJsonSection(item.path, 'permission', item.content, false);
+        if (res.readOnly) {
+          console.log(`  [READ-ONLY (SKIPPED)] ${item.target} -> ${item.path} (managed externally)`);
+        } else {
+          console.log(`  [${res.changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
+        }
       }
-      console.log(`  [${changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
     }
   }
 
@@ -331,7 +401,7 @@ export async function main(args = process.argv.slice(2)) {
     process.exit(1);
   }
 
-  // 6. Validate with Codex execpolicy check
+  // 8. Validate with Codex execpolicy check
   console.log(`\n[Permission Validation] Running codex execpolicy assertions...`);
   const ruleFilesToCheck = [userCodexPath, projectCodexPath].filter(p => fs.existsSync(p));
 

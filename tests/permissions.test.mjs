@@ -247,3 +247,69 @@ test('8. Modular components in lib/*.mjs can be imported directly', async () => 
   assert.equal(parsed.name, 'test');
   assert.deepEqual(parsed.allow, ['Bash(pwd)']);
 });
+
+test('9. Compilers for common other agents (Cursor, OpenCode, Grok, Kimi, Droid)', async () => {
+  const {
+    compileCursorPermissions,
+    compileOpenCodePermissions,
+    compileGrokPermissions,
+    compileKimiPermissions,
+    compileDroidPermissions,
+  } = await import('../scripts/lib/compilers.mjs');
+
+  const policy = {
+    allow: ['Bash(git status:*)', 'Bash(pwd)', 'WebSearch(docs)'],
+    deny: ['Bash(sudo:*)', 'Bash(rm -rf /)'],
+    ask: ['Bash(terraform apply:*)']
+  };
+
+  // Cursor: maps Bash -> Shell, WebSearch -> WebFetch
+  const cursor = compileCursorPermissions(policy);
+  assert.ok(cursor.allow.includes('Shell(git status:*)'));
+  assert.ok(cursor.allow.includes('WebFetch(docs)'));
+  assert.ok(cursor.deny.includes('Shell(sudo:*)'));
+  assert.ok(cursor.ask.includes('Shell(terraform apply:*)'));
+
+  // OpenCode: maps to permission.bash { pattern: action }
+  const opencode = compileOpenCodePermissions(policy);
+  assert.equal(opencode.permission.bash['git status:*'], 'allow');
+  assert.equal(opencode.permission.bash['pwd'], 'allow');
+  assert.equal(opencode.permission.bash['sudo:*'], 'deny');
+  assert.equal(opencode.permission.bash['terraform apply:*'], 'ask');
+
+  // Grok: maps to permission.rules [{ tool, pattern, action }]
+  const grok = compileGrokPermissions(policy);
+  assert.ok(grok.permission.rules.some(r => r.tool === 'bash' && r.pattern === 'git status:*' && r.action === 'allow'));
+  assert.ok(grok.permission.rules.some(r => r.tool === 'bash' && r.pattern === 'sudo:*' && r.action === 'deny'));
+
+  // Kimi: TOML generation
+  const kimi = compileKimiPermissions(policy, 'test');
+  assert.ok(kimi.includes('[permission]'));
+  assert.ok(kimi.includes('"allow"'));
+  assert.ok(kimi.includes('"deny"'));
+
+  // Droid: commandAllowlist & commandDenylist
+  const droid = compileDroidPermissions(policy);
+  assert.ok(droid.commandAllowlist.includes('git status *'));
+  assert.ok(droid.commandDenylist.includes('sudo *'));
+});
+
+test('10. Agents reading .agents natively are skipped from redundant compilation', async () => {
+  const {
+    AGENTS_READING_CANONICAL_DIRECTLY,
+    requiresNativeCompiler
+  } = await import('../scripts/lib/compilers.mjs');
+
+  assert.equal(requiresNativeCompiler('claude'), true);
+  assert.equal(requiresNativeCompiler('codex'), true);
+  assert.equal(requiresNativeCompiler('cursor'), true);
+  assert.equal(requiresNativeCompiler('opencode'), true);
+
+  // Register a mock native agent that reads .agents directly
+  AGENTS_READING_CANONICAL_DIRECTLY.add('mock-native-agent');
+  try {
+    assert.equal(requiresNativeCompiler('mock-native-agent'), false);
+  } finally {
+    AGENTS_READING_CANONICAL_DIRECTLY.delete('mock-native-agent');
+  }
+});
