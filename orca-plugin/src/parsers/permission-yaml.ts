@@ -137,8 +137,12 @@ export function loadPermissionGroups(
   return groups
 }
 
-export function inspectNativeSync(workspacePath: string): NativeAgentSyncStatus {
-  const claudeSettingsPath = path.join(workspacePath, '.claude', 'settings.json')
+export function inspectNativeSync(workspacePath: string, homeDir = os.homedir()): NativeAgentSyncStatus {
+  const claudeCandidates = [
+    path.join(workspacePath, '.claude', 'settings.json'),
+    path.join(homeDir, '.claude', 'settings.json'),
+  ]
+  const claudeSettingsPath = claudeCandidates.find(p => fs.existsSync(p)) || claudeCandidates[0]
   let claudeSynced = false
   let claudeAllowCount = 0
   let claudeDenyCount = 0
@@ -151,7 +155,13 @@ export function inspectNativeSync(workspacePath: string): NativeAgentSyncStatus 
     } catch {}
   }
 
-  const codexRulesPath = path.join(workspacePath, '.codex', 'rules', 'default.rules')
+  const codexCandidates = [
+    path.join(workspacePath, '.codex', 'rules', 'generated-agents-policy.rules'),
+    path.join(workspacePath, '.codex', 'rules', 'default.rules'),
+    path.join(homeDir, '.codex', 'rules', 'generated-agents-policy.rules'),
+    path.join(homeDir, '.codex', 'rules', 'default.rules'),
+  ]
+  const codexRulesPath = codexCandidates.find(p => fs.existsSync(p)) || codexCandidates[0]
   let codexSynced = false
   let codexRuleCount = 0
   if (fs.existsSync(codexRulesPath)) {
@@ -162,7 +172,11 @@ export function inspectNativeSync(workspacePath: string): NativeAgentSyncStatus 
     } catch {}
   }
 
-  const geminiSettingsPath = path.join(workspacePath, '.gemini', 'settings.json')
+  const geminiCandidates = [
+    path.join(workspacePath, '.gemini', 'settings.json'),
+    path.join(homeDir, '.gemini', 'antigravity-cli', 'settings.json'),
+  ]
+  const geminiSettingsPath = geminiCandidates.find(p => fs.existsSync(p)) || geminiCandidates[0]
   let geminiSynced = false
   let geminiAllowCount = 0
   let geminiDenyCount = 0
@@ -170,7 +184,8 @@ export function inspectNativeSync(workspacePath: string): NativeAgentSyncStatus 
     try {
       const data = JSON.parse(fs.readFileSync(geminiSettingsPath, 'utf8'))
       geminiSynced = true
-      geminiAllowCount = Array.isArray(data?.tools?.allowed) ? data.tools.allowed.length : 0
+      const perms = Array.isArray(data?.permissions) ? data.permissions : []
+      geminiAllowCount = Array.isArray(data?.tools?.allowed) ? data.tools.allowed.length : perms.length
       geminiDenyCount = Array.isArray(data?.tools?.exclude) ? data.tools.exclude.length : 0
     } catch {}
   }

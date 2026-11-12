@@ -37,9 +37,9 @@ function renderHeader(): void {
   if (syncBadge) {
     const ns = report.nativeSync
     const syncedCount =
-      (ns.claudeSettings.synced ? 1 : 0) +
-      (ns.codexRules.synced ? 1 : 0) +
-      (ns.geminiPolicies.synced ? 1 : 0)
+      (ns?.claudeSynced ? 1 : 0) +
+      (ns?.codexSynced ? 1 : 0) +
+      (ns?.geminiSynced ? 1 : 0)
     if (syncedCount >= 2) {
       syncBadge.className = 'badge allow'
       syncBadge.textContent = 'Synced'
