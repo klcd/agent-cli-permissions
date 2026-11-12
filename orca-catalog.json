@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stablyai/orca/main/docs/schemas/plugins/orca-catalog.v2.schema.json",
+  "catalogVersion": 2,
+  "name": "Agent CLI Permissions Catalog",
+  "owner": "klcd",
+  "plugins": [
+    {
+      "id": "klcd.agent-permissions",
+      "source": {
+        "kind": "git",
+        "url": "https://github.com/klcd/agent-cli-permissions.git",
+        "ref": "main",
+        "path": "orca-plugin"
+      },
+      "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules across AI agents.",
+      "categories": [
+        "developer-tools"
+      ],
+      "releases": [
+        {
+          "version": "0.1.0",
+          "commit": "70023a6583e7797fd8e3f7d7b57bd75b770bc132",
+          "contentHash": "ce2ce83a7135566c8c4756d195af6a6cb9b5e5af0d4a155bdc2a7e18586f86da",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Agent CLI Permissions",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "CLI Permissions"
+            },
+            {
+              "kind": "commands",
+              "name": "Agent Permissions: Sync Canonical YAML Rules"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
