@@ -307,19 +307,147 @@ export function checkCodexPolicy(rulePaths, commandTokens) {
 }
 
 /**
+ * Displays all installed permission sets across baseline and project scopes
+ */
+export function listPermissions(baselineDir, projectPermsDir) {
+  console.log(`\nInstalled Permission Sets:`);
+
+  const printDirSets = (label, dirPath) => {
+    console.log(`\n  ${label} (${dirPath}):`);
+    if (!fs.existsSync(dirPath)) {
+      console.log(`    (none found)`);
+      return;
+    }
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    let count = 0;
+    for (const entry of entries) {
+      if (!entry.isFile() || (!entry.name.endsWith('.yml') && !entry.name.endsWith('.yaml'))) continue;
+      const fullPath = path.join(dirPath, entry.name);
+      try {
+        const parsed = yaml.parse(fs.readFileSync(fullPath, 'utf8'));
+        const name = parsed?.name || path.basename(entry.name, path.extname(entry.name));
+        const desc = parsed?.description ? ` - ${parsed.description}` : '';
+        const allowCount = Array.isArray(parsed?.allow) ? parsed.allow.length : 0;
+        const denyCount = Array.isArray(parsed?.deny) ? parsed.deny.length : 0;
+        const askCount = Array.isArray(parsed?.ask) ? parsed.ask.length : 0;
+        const askStr = askCount > 0 ? `, ${askCount} ask` : '';
+        console.log(`    • ${name}${desc}`);
+        console.log(`      (${allowCount} allow, ${denyCount} deny${askStr} rules)`);
+        count++;
+      } catch (err) {
+        console.log(`    • ${entry.name} (error reading: ${err.message})`);
+      }
+    }
+    if (count === 0) {
+      console.log(`    (no .yml rule files)`);
+    }
+  };
+
+  printDirSets('Company / User Baseline', baselineDir);
+  printDirSets('Project Policy', projectPermsDir);
+  console.log();
+}
+
+/**
+ * Views details of a specific permission set by name
+ */
+export function viewPermissionSet(setName, baselineDir, projectPermsDir) {
+  if (!setName) {
+    console.error(`\n[ERROR] Please specify a permission set name to view. Example: just agent-permissions-view security-baseline`);
+    process.exit(1);
+  }
+
+  const searchDirs = [baselineDir, projectPermsDir];
+  let found = null;
+  let foundPath = null;
+
+  for (const d of searchDirs) {
+    if (!fs.existsSync(d)) continue;
+    const entries = fs.readdirSync(d, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isFile() || (!e.name.endsWith('.yml') && !e.name.endsWith('.yaml'))) continue;
+      const p = path.join(d, e.name);
+      try {
+        const parsed = yaml.parse(fs.readFileSync(p, 'utf8'));
+        const name = parsed?.name || path.basename(e.name, path.extname(e.name));
+        if (name === setName || e.name === setName || e.name === `${setName}.yml` || e.name === `${setName}.yaml`) {
+          found = parsed;
+          foundPath = p;
+          break;
+        }
+      } catch {}
+    }
+    if (found) break;
+  }
+
+  if (!found) {
+    console.error(`\n[ERROR] Permission set '${setName}' not found in either ${baselineDir} or ${projectPermsDir}`);
+    process.exit(1);
+  }
+
+  console.log(`\n========================================`);
+  console.log(`Permission Set: ${found.name || setName}`);
+  console.log(`Source File:    ${foundPath}`);
+  if (found.description) {
+    console.log(`Description:    ${found.description}`);
+  }
+  console.log(`========================================\n`);
+
+  if (Array.isArray(found.allow) && found.allow.length > 0) {
+    console.log(`Allow Rules (${found.allow.length}):`);
+    for (const r of found.allow) {
+      console.log(`  ✓ ${r}`);
+    }
+  } else {
+    console.log(`Allow Rules: (none)`);
+  }
+
+  if (Array.isArray(found.deny) && found.deny.length > 0) {
+    console.log(`\nDeny Rules (${found.deny.length}):`);
+    for (const r of found.deny) {
+      console.log(`  ✗ ${r}`);
+    }
+  } else {
+    console.log(`\nDeny Rules: (none)`);
+  }
+
+  if (Array.isArray(found.ask) && found.ask.length > 0) {
+    console.log(`\nAsk/Prompt Rules (${found.ask.length}):`);
+    for (const r of found.ask) {
+      console.log(`  ? ${r}`);
+    }
+  }
+
+  console.log();
+}
+
+/**
  * Main execution function
  */
 export async function main(args = process.argv.slice(2)) {
-  const isCheckMode = args.includes('--check') || args.includes('check');
   const projectRoot = process.cwd();
   const homeDir = os.homedir();
+  const baselineDir = path.join(homeDir, '.agents', 'permissions');
+  const projectPermsDir = path.join(projectRoot, '.agents', 'permissions');
+
+  // Handle 'list' mode
+  if (args.includes('list') || args.includes('--list')) {
+    listPermissions(baselineDir, projectPermsDir);
+    return;
+  }
+
+  // Handle 'view' mode
+  const viewIdx = args.findIndex(a => a === 'view' || a === '--view');
+  if (viewIdx !== -1) {
+    const setName = args[viewIdx + 1];
+    viewPermissionSet(setName, baselineDir, projectPermsDir);
+    return;
+  }
+
+  const isCheckMode = args.includes('--check') || args.includes('check');
 
   console.log(`[Permission Sync] Running in ${isCheckMode ? 'CHECK' : 'SYNC'} mode...`);
   console.log(`[Permission Sync] Project root: ${projectRoot}`);
-
-  // 1. Resolve canonical directories
-  const baselineDir = path.join(homeDir, '.agents', 'permissions');
-  const projectPermsDir = path.join(projectRoot, '.agents', 'permissions');
 
   console.log(`[Permission Sync] Loading company baseline from ${baselineDir}...`);
   const baselinePolicy = loadPolicyDirectory(baselineDir);
@@ -393,17 +521,6 @@ export async function main(args = process.argv.slice(2)) {
         changed = res.changed;
       }
       console.log(`  [${changed ? 'UPDATED' : 'UP-TO-DATE'}] ${item.target} -> ${item.path}`);
-    }
-  }
-
-  // Also maintain ~/.agents/permissions/groups/*.yml for AGI CLI compatibility
-  if (!isCheckMode && fs.existsSync(baselineDir)) {
-    const groupsDir = path.join(baselineDir, 'groups');
-    fs.mkdirSync(groupsDir, { recursive: true });
-    for (const f of baselinePolicy.files) {
-      const src = path.join(baselineDir, f);
-      const dst = path.join(groupsDir, f);
-      fs.copyFileSync(src, dst);
     }
   }
 

@@ -108,13 +108,12 @@ This command:
 4. Compiles Antigravity native configuration (`.gemini/settings.json`).
 5. Generates Codex native execpolicy rules (`.codex/rules/generated-agents-policy.rules`).
 6. Executes `codex execpolicy check` against the test matrix to verify behavior.
-7. Synchronizes `~/.agents/permissions/groups/` for compatibility with `agents permissions list/view`.
 
 Synchronization is strictly **deterministic** and **idempotent**. Running the sync command repeatedly produces zero diff.
 
 ---
 
-## 5. How to Validate Permissions
+## 5. How to Validate, List & View Permissions
 
 To verify permissions without mutating any files:
 
@@ -123,6 +122,22 @@ just agent-permissions-check
 ```
 
 This command checks for configuration drift between `.agents/permissions/` and native generated files, returning exit code `0` if in sync and `1` if drift is detected.
+
+To list all active permission sets across baseline and project scopes:
+
+```bash
+just agent-permissions-list
+```
+
+To view details and all allow/deny rules of a specific permission set:
+
+```bash
+just agent-permissions-view <set-name>
+# Examples:
+# just agent-permissions-view project
+# just agent-permissions-view security-baseline
+# just agent-permissions-view infrastructure
+```
 
 To run the automated policy test suite:
 
