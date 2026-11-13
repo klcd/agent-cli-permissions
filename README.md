@@ -110,6 +110,25 @@ flowchart TD
 
 ---
 
+## Install the Orca Plugin
+
+The **CLI Permissions** panel is published in the [Orca plugin directory](https://onorca.dev/plugins/klcd/agent-cli-permissions). It inspects the canonical `.agents/permissions/*.yml` rules for the focused workspace, tests commands against `DENY > ASK > ALLOW`, and syncs them to the native agent configs — all from Orca's sidebar.
+
+```bash
+# Install from the published directory (recommended)
+orca plugin install klcd.agent-permissions
+
+# Or install directly from this repository
+orca plugin install https://github.com/klcd/agent-cli-permissions.git --path orca-plugin
+
+# Open the panel
+orca plugin open klcd.agent-permissions --panel cli-permissions
+```
+
+The plugin asks for two capabilities only — **read workspace details** (to find the focused project) and **show notifications** (for the sync command's result). See [`orca-plugin/REVIEW.md`](orca-plugin/REVIEW.md) for a full map of what the worker reads and runs.
+
+---
+
 ## Commands & Usage
 
 `agent-cli-permissions` provides a zero-dependency CLI executable via **`npx`**, standard **`npm`** scripts, or directly via [`bin/agent-permissions`](file:///Users/cedric/Projects/AgenticCoding/permission-setup/bin/agent-permissions):

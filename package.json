@@ -1,6 +1,6 @@
 {
   "name": "agent-cli-permissions",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Unified Coding-Agent Permission Synchronizer & CLI",
   "type": "module",
   "bin": {
