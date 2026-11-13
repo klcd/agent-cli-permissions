@@ -3,10 +3,10 @@
   "id": "agent-permissions",
   "publisher": "klcd",
   "name": "Agent CLI Permissions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "repository": "https://github.com/klcd/agent-cli-permissions",
-  "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules to Claude Code, Codex, and Antigravity.",
+  "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test commands against permission groups, and sync them into the native permission formats of compatible AI coding agents (Claude Code, Codex, Antigravity, and more).",
   "icon": "assets/icon.png",
   "cover": {
     "path": "assets/cover.png",
@@ -48,5 +48,8 @@
       }
     ]
   },
-  "capabilities": []
+  "capabilities": [
+    { "kind": "workspace:read" },
+    { "kind": "notifications:show" }
+  ]
 }

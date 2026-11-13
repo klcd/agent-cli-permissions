@@ -1,13 +1,6 @@
+// Public surface of the worker's policy core. Everything the worker and tests
+// use lives in these four modules — all pure, read-only, no process spawning.
 export * from './types.ts'
-export * from './state/file-lock.ts'
-export * from './state/worktree-paths.ts'
-export * from './state/sandbox-registry.ts'
-export * from './state/sandbox-mode.ts'
-export * from './state/session-egress.ts'
 export * from './parsers/permission-yaml.ts'
-export * from './parsers/openshell-policy.ts'
-export * from './sandbox/sandbox-control.ts'
-export * from './context/orca-context.ts'
 export * from './policy/evaluator.ts'
-export * from './policy/l7-mutator.ts'
 export * from './policy/report-builder.ts'

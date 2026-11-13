@@ -4,13 +4,51 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  buildPolicyReport,
-  buildPolicyReportAsync,
-  evaluateCommandPolicy,
-  getAugmentedEnv,
-} from './policy-inspector.ts'
+import { buildPolicyReport, evaluateCommandPolicy } from './policy-inspector.ts'
 
+type AgentId = 'claude' | 'codex' | 'antigravity'
+
+/** Keep only a recognised agent id; anything else falls back to the report default. */
+function asAgent(value: unknown): AgentId | undefined {
+  return value === 'claude' || value === 'codex' || value === 'antigravity' ? value : undefined
+}
+
+/**
+ * Find the folder of the workspace the user is looking at, so we read the right
+ * project's `.agents/permissions`. Uses only the documented, capability-gated
+ * host API (`workspace:read`): `workspace.readContext` says which workspace is
+ * focused, `workspace.list` gives its path. Falls back to the current directory.
+ */
+async function resolveWorkspacePath(orca: OrcaWorkerApi, explicit?: string): Promise<string> {
+  if (explicit && fs.existsSync(explicit)) return explicit
+  try {
+    const call = orca.host?.call
+    if (call) {
+      const ctx = (await call('workspace.readContext')) as
+        | { name?: string; branch?: string | null }
+        | null
+      if (ctx?.name) {
+        const listed = (await call('workspace.list', {})) as {
+          workspaces?: Array<{ name: string; path: string; branch: string | null }>
+        }
+        const ws =
+          listed.workspaces?.find(
+            w => w.name === ctx.name && (ctx.branch == null || w.branch === ctx.branch) && w.path
+          ) || listed.workspaces?.find(w => w.name === ctx.name && w.path)
+        if (ws?.path) return ws.path
+      }
+    }
+  } catch {
+    // Host unavailable or workspace unknown: fall back below.
+  }
+  return explicit || process.cwd()
+}
+
+/**
+ * Run the bundled sync CLI to write `~/.agents/permissions/*.yml` out to each
+ * native agent config. Shells out to this project's own `agent-permissions`
+ * script when present (a dev checkout); otherwise reports the loaded rule count.
+ */
 export function syncCanonicalPermissions(
   workspacePath?: string,
   homeDir = os.homedir()
@@ -35,12 +73,7 @@ export function syncCanonicalPermissions(
       const hasWorkspacePerms =
         workspacePath && fs.existsSync(path.join(workspacePath, '.agents', 'permissions'))
       const cwd = hasWorkspacePerms ? workspacePath! : repoRoot
-      const out = execFileSync(cmd, args, {
-        cwd,
-        encoding: 'utf8',
-        timeout: 15000,
-        env: getAugmentedEnv(homeDir),
-      }).trim()
+      const out = execFileSync(cmd, args, { cwd, encoding: 'utf8', timeout: 15000 }).trim()
       const lines = out.split(/\r?\n/).filter(Boolean)
       const summaryLine = lines[lines.length - 1] || lines[0] || ''
       return {
@@ -50,10 +83,7 @@ export function syncCanonicalPermissions(
           'Synced ~/.agents/permissions/*.yml across Claude, Codex, Antigravity, Cursor, and OpenCode.',
       }
     } catch (err: any) {
-      return {
-        ok: false,
-        message: String(err?.stderr || err?.message || err).trim(),
-      }
+      return { ok: false, message: String(err?.stderr || err?.message || err).trim() }
     }
   }
   const report = buildPolicyReport({ workspacePath, homeDir })
@@ -63,6 +93,7 @@ export function syncCanonicalPermissions(
   }
 }
 
+/** Install the SessionStart auto-sync hook and the Git pre-commit gate via the bundled CLI. */
 export function installHooksHandler(
   workspacePath?: string,
   homeDir = os.homedir()
@@ -87,10 +118,7 @@ export function installHooksHandler(
         message: 'Configured SessionStart auto-sync hook and Git pre-commit compliance gate.',
       }
     } catch (err: any) {
-      return {
-        ok: false,
-        message: String(err?.stderr || err?.message || err).trim(),
-      }
+      return { ok: false, message: String(err?.stderr || err?.message || err).trim() }
     }
   }
   return { ok: true, message: 'Hooks configured.' }
@@ -98,71 +126,43 @@ export function installHooksHandler(
 
 export default function activate(orca: OrcaWorkerApi): void {
   const toStrictJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+  const asObj = (input: unknown) =>
+    (input && typeof input === 'object' ? input : {}) as { workspacePath?: string; agent?: string; command?: string }
 
   orca.panels?.handle('getPolicyReport', async (input) => {
-    const req = (input && typeof input === 'object' ? input : {}) as {
-      workspacePath?: string
-      agent?: string
-    }
-    const report = await buildPolicyReportAsync({
-      workspacePath: req.workspacePath,
-      agent: req.agent,
-    })
-    return toStrictJson(report)
+    const req = asObj(input)
+    const workspacePath = await resolveWorkspacePath(orca, req.workspacePath)
+    return toStrictJson(buildPolicyReport({ workspacePath, agent: asAgent(req.agent) }))
   })
 
   orca.panels?.handle('evaluateCommand', async (input) => {
-    const req = (input && typeof input === 'object' ? input : {}) as {
-      command?: string
-      workspacePath?: string
-      agent?: string
-    }
-    const report = await buildPolicyReportAsync({
-      workspacePath: req.workspacePath,
-      agent: req.agent,
-    })
+    const req = asObj(input)
+    const workspacePath = await resolveWorkspacePath(orca, req.workspacePath)
+    const report = buildPolicyReport({ workspacePath, agent: asAgent(req.agent) })
     return toStrictJson(evaluateCommandPolicy(String(req.command || ''), report))
   })
 
   orca.panels?.handle('syncPermissions', async (input) => {
-    const req = (input && typeof input === 'object' ? input : {}) as {
-      workspacePath?: string
-      agent?: string
-    }
-    const syncRes = syncCanonicalPermissions(req.workspacePath)
-    const report = await buildPolicyReportAsync({
-      workspacePath: req.workspacePath,
-      agent: req.agent,
-    })
-    return toStrictJson({
-      ...syncRes,
-      report,
-    })
+    const req = asObj(input)
+    const workspacePath = await resolveWorkspacePath(orca, req.workspacePath)
+    const syncRes = syncCanonicalPermissions(workspacePath)
+    const report = buildPolicyReport({ workspacePath, agent: asAgent(req.agent) })
+    return toStrictJson({ ...syncRes, report })
   })
 
   orca.panels?.handle('installHooks', async (input) => {
-    const req = (input && typeof input === 'object' ? input : {}) as {
-      workspacePath?: string
-      agent?: string
-    }
-    const hookRes = installHooksHandler(req.workspacePath)
-    const report = await buildPolicyReportAsync({
-      workspacePath: req.workspacePath,
-      agent: req.agent,
-    })
-    return toStrictJson({
-      ...hookRes,
-      report,
-    })
+    const req = asObj(input)
+    const workspacePath = await resolveWorkspacePath(orca, req.workspacePath)
+    const hookRes = installHooksHandler(workspacePath)
+    const report = buildPolicyReport({ workspacePath, agent: asAgent(req.agent) })
+    return toStrictJson({ ...hookRes, report })
   })
 
   orca.commands?.register('agentPermissions.sync', async () => {
     const res = syncCanonicalPermissions()
     if (orca.host?.call) {
       void orca.host
-        .call('notifications.info', {
-          message: res.message,
-        })
+        .call('notifications.show', { title: 'Agent CLI Permissions', body: res.message })
         .catch(() => {})
     }
     return toStrictJson(res)

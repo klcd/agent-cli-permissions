@@ -1,3 +1,11 @@
+// Types for the Agent CLI Permissions plugin.
+//
+// The plugin does exactly one thing: read canonical `.agents/permissions/*.yml`
+// rule files (global + project), show them, and test a command against them under
+// DENY > ASK > ALLOW precedence. These types describe only that. There is no
+// sandbox, network, or process-spawning model here.
+
+/** One `allow` / `ask` / `deny` entry parsed from a permission YAML file. */
 export interface CliPermissionRule {
   raw: string
   tool: string
@@ -10,9 +18,11 @@ export interface CliPermissionRule {
   groupDescription: string
   sourceFile: string
   explanation: string
+  /** Which agents this rule applies to; every rule targets all supported agents. */
   compatibleAgents: string[]
 }
 
+/** One parsed permission file (a "permission group"). */
 export interface PermissionGroupSummary {
   name: string
   description: string
@@ -24,68 +34,7 @@ export interface PermissionGroupSummary {
   rules: CliPermissionRule[]
 }
 
-export interface L7HttpRule {
-  action: 'allow' | 'deny'
-  method: string
-  path: string
-}
-
-export interface NetworkEndpointRule {
-  policyName: string
-  source: string
-  sourcePath?: string
-  ruleScope?: 'temporary' | 'project' | 'global' | 'profile'
-  temporary?: boolean
-  host: string
-  port: number
-  protocol: string
-  access: string
-  enforcement: string
-  binaries: string[]
-  compatibleCliCommands: string[]
-  triggerSource: string
-  triggerExplanation: string
-  l7Rules?: L7HttpRule[]
-}
-
-export interface AgentProfilePolicy {
-  agent: 'claude' | 'codex' | 'antigravity'
-  displayName: string
-  hostWrapper: string
-  hostWrapperInstalled: boolean
-  containerImage: string
-  providerProfile: string
-  surfaces: Array<{ surface: string; transport: string; cliExample: string }>
-  credentialPlaceholders: string[]
-  allowedBinaries: string[]
-  landlockMode: string
-  filesystemReadWrite: string[]
-  filesystemReadOnly: string[]
-  endpoints: NetworkEndpointRule[]
-}
-
-export interface DelegationPolicySummary {
-  autoGrantEnabled: boolean
-  configPath: string | null
-  allowedAgents: string[]
-  maxWorkers: number
-  maxDepth: number
-  activeGrants: Array<{
-    terminal: string
-    workspace: string
-    agents: string[]
-    depth: number
-    maxDepth: number
-    maxWorkers: number
-    remainingWorkers: number
-  }>
-  allowedCliCommands: Array<{
-    command: string
-    description: string
-  }>
-  blockedFlags: string[]
-}
-
+/** Read-only view of whether the canonical rules have been synced to each native agent config. */
 export interface NativeAgentSyncStatus {
   claudeSettingsPath: string
   claudeSynced: boolean
@@ -104,13 +53,7 @@ export interface NativeAgentSyncStatus {
   gitHookActive: boolean
 }
 
-export interface ActiveSandboxInfo {
-  name: string
-  created: string
-  phase: string
-  agent: string
-}
-
+/** The workspace whose rules are being shown. */
 export interface WorkspaceEntry {
   id: string
   name: string
@@ -118,223 +61,20 @@ export interface WorkspaceEntry {
   branch: string | null
 }
 
-export interface ActiveAgentSessionInfo {
-  agent: 'claude' | 'codex' | 'antigravity'
-  state: string
-  conversationName: string | null
-  paneKey: string | null
-  updatedAt: number
-}
-
-export interface SandboxModeState {
-  enabled: boolean
-  updatedAt: string | null
-  inheritedFrom: string | null
-}
-
+/** Everything the panel renders. Pure data, computed by reading files only. */
 export interface PolicyInspectionReport {
   generatedAt: string
-  sandboxEnabled: boolean
-  defaultSandboxEnabled: boolean
-  sandboxInheritedFrom: string | null
-  sandboxIdleTimeoutSeconds: number
   selectedWorkspace: WorkspaceEntry
   currentAgent: 'claude' | 'codex' | 'antigravity'
-  activeAgentSessions: ActiveAgentSessionInfo[]
-  workspaces: WorkspaceEntry[]
-  activeSandboxes: ActiveSandboxInfo[]
-  agents: AgentProfilePolicy[]
   permissionGroups: PermissionGroupSummary[]
   allCliRules: CliPermissionRule[]
-  delegation: DelegationPolicySummary
   nativeSync: NativeAgentSyncStatus
 }
 
-export interface OrcaWorktreePsEntry {
-  worktreeId?: string
-  worktreeInstanceId?: string
-  parentWorktreeId?: string | null
-  childWorktreeIds?: string[]
-  isMainWorktree?: boolean
-  path?: string
-  repo?: string
-  displayName?: string
-  branch?: string | null
-  isActive?: boolean
-  agents?: Array<{
-    paneKey?: string | null
-    state?: string
-    agentType?: string
-    conversationName?: string | null
-    updatedAt?: number
-  }>
-}
-
-export interface SandboxModeFileData {
-  enabled?: boolean
-  defaultEnabled?: boolean
-  updatedAt?: string
-  idleTimeoutSeconds?: number
-  tabIdleTimeouts?: Record<string, { seconds: number; updatedAt: string }>
-  worktrees?: Record<string, { enabled: boolean; updatedAt: string; workspaceId?: string }>
-  orcaWorkspaces?: Record<string, { enabled: boolean; updatedAt: string; path?: string }>
-  parentPaths?: Record<string, string>
-}
-
-export interface SandboxModeQueryOptions {
-  workspacePath?: string
-  workspaceId?: string
-  parentPaths?: Record<string, string>
-}
-
-export interface SandboxIdleTimeoutOptions {
-  sandboxName?: string | null
-  agentSessionId?: string | null
-  terminalId?: string | null
-  paneKey?: string | null
-  workspacePath?: string | null
-  agent?: string | null
-}
-
-export interface SessionEgressEntry {
-  sandboxName?: string
-  workspacePath: string
-  agent: 'claude' | 'codex' | 'antigravity'
-  ruleName: string
-  host: string
-  port: number
-  action: 'allow' | 'deny'
-  method: string
-  path: string
-  binary: string
-  triggerCommand?: string
-  createdAt: string
-}
-
-export interface SandboxRegistryEntry {
-  sandboxName: string
-  agent: 'claude' | 'codex' | 'antigravity'
-  workspacePath: string
-  workspaceId?: string
-  terminalId?: string
-  agentSessionId?: string
-  pid?: number
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface L7PolicySuggestion {
-  ruleName: string
-  host: string
-  port: number
-  action: 'allow' | 'deny'
-  method: string
-  path: string
-  binary: string
-  triggerCommand?: string
-}
-
-export interface CommandExecutionOutput {
-  executed: boolean
-  target: 'sandbox' | 'host'
-  sandboxName?: string | null
-  cwd: string
-  exitCode: number | null
-  stdout: string
-  stderr: string
-  durationMs: number
-  skippedReason?: string
-}
-
+/** Result of testing one command against the loaded rules. */
 export interface CommandEvaluationResult {
   command: string
   verdict: 'allow' | 'deny' | 'ask'
   summary: string
   matchedRules: CliPermissionRule[]
-  sandboxChecks: Array<{
-    layer: string
-    status: 'pass' | 'warn' | 'block'
-    detail: string
-  }>
-  l7Suggestion?: L7PolicySuggestion
-  execution?: CommandExecutionOutput
-}
-
-export interface AddL7PolicyRequest {
-  scope: 'session' | 'workspace' | 'global'
-  sandboxName?: string
-  workspacePath?: string
-  agent?: string
-  ruleName?: string
-  host: string
-  port?: number
-  action?: 'allow' | 'deny'
-  method?: string
-  path?: string
-  binary?: string
-  triggerCommand?: string
-}
-
-export interface AddL7PolicyResult {
-  ok: boolean
-  scope: 'session' | 'workspace' | 'global'
-  message: string
-  targetFile?: string
-  appliedSandboxes?: string[]
-  cliCommandsRun?: string[]
-}
-
-export interface CurrentOrcaContext {
-  workspace: WorkspaceEntry
-  currentAgent: 'claude' | 'codex' | 'antigravity'
-  activeAgentSessions: ActiveAgentSessionInfo[]
-}
-
-export interface ParsedOpenShellPolicy {
-  landlock?: string
-  includeWorkdir?: boolean
-  readOnly: string[]
-  readWrite: string[]
-  endpoints: NetworkEndpointRule[]
-}
-
-export interface SandboxDoctorCheck {
-  id: string
-  label: string
-  status: 'pass' | 'warn' | 'fail'
-  detail: string
-}
-
-export interface SandboxDoctorReport {
-  ok: boolean
-  checkedAt: string
-  checks: SandboxDoctorCheck[]
-}
-
-export function normalizeAgentId(raw?: string | null): 'claude' | 'codex' | 'antigravity' | null {
-  if (!raw) return null
-  const lower = raw.toLowerCase().trim()
-  if (lower === 'claude' || lower === 'claude-code' || lower === 'claude-box') return 'claude'
-  if (lower === 'codex' || lower === 'codex-box') return 'codex'
-  if (lower === 'antigravity' || lower === 'agy' || lower === 'agy-box' || lower === 'gemini') return 'antigravity'
-  return null
-}
-
-export function inferSandboxAgent(name: string): string {
-  if (name.startsWith('cc-')) return 'claude'
-  if (name.startsWith('cx-')) return 'codex'
-  if (name.startsWith('ag-')) return 'antigravity'
-  return 'custom'
-}
-
-export function extractAgentSessionIdFromPaneKey(paneKey?: string | null): string | null {
-  if (!paneKey) return null
-  const prefix = 'structured-agent-session-'
-  if (paneKey.startsWith(prefix)) {
-    const rest = paneKey.slice(prefix.length)
-    const colonIdx = rest.indexOf(':')
-    const id = colonIdx >= 0 ? rest.slice(0, colonIdx) : rest
-    return id || null
-  }
-  return null
 }
