@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b2b4d"/>
+      <stop offset="0.55" stop-color="#061b32"/>
+      <stop offset="1" stop-color="#030f1e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.2" r="0.85">
+      <stop offset="0" stop-color="#e9a3ed" stop-opacity="0.28"/>
+      <stop offset="0.5" stop-color="#e9a3ed" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#e9a3ed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shieldStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f3b9f0"/>
+      <stop offset="1" stop-color="#d957c6"/>
+    </linearGradient>
+    <linearGradient id="shieldFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3157" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#071f3a" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- badge background -->
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#glow)"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="2"/>
+
+  <!-- shield -->
+  <path d="M256 92
+           L366 132
+           Q380 137 380 152
+           L380 268
+           C380 346 330 396 256 430
+           C182 396 132 346 132 268
+           L132 152
+           Q132 137 146 132
+           Z"
+        fill="url(#shieldFill)" stroke="url(#shieldStroke)" stroke-width="12" stroke-linejoin="round"/>
+
+  <!-- terminal prompt: chevron -->
+  <polyline points="214,176 262,216 214,256"
+            fill="none" stroke="#ffffff" stroke-width="24"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- cursor underscore -->
+  <line x1="276" y1="258" x2="324" y2="258" stroke="#e9a3ed" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- DENY > ASK > ALLOW precedence trio -->
+  <circle cx="212" cy="332" r="15" fill="#f85149"/>
+  <circle cx="256" cy="332" r="15" fill="#d29922"/>
+  <circle cx="300" cy="332" r="15" fill="#2ea043"/>
+</svg>

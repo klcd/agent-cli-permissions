@@ -3,10 +3,29 @@
   "id": "agent-permissions",
   "publisher": "klcd",
   "name": "Agent CLI Permissions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "repository": "https://github.com/klcd/agent-cli-permissions",
   "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules to Claude Code, Codex, and Antigravity.",
+  "icon": "assets/icon.png",
+  "cover": {
+    "path": "assets/cover.png",
+    "alt": "Agent CLI Permissions: two-tier permission governance for AI coding agents, with the DENY > ASK > ALLOW precedence chain and target agent names."
+  },
+  "screenshots": [
+    {
+      "path": "assets/screenshot-1-rules.png",
+      "alt": "The panel showing 207 rules across the company baseline and project tiers, colour-coded allow or deny and grouped by permission set.",
+      "caption": "Browse every rule across company baseline and project tiers, resolved by DENY > ASK > ALLOW.",
+      "theme": "dark"
+    },
+    {
+      "path": "assets/screenshot-2-sidebar.png",
+      "alt": "The panel in the Orca sidebar with a command tester, governance badges for remote policy, auto-sync and git gate, and an Enforce button.",
+      "caption": "Test commands, watch governance status, and Enforce hooks right from the Orca sidebar.",
+      "theme": "dark"
+    }
+  ],
   "engines": {
     "orca": ">=1.4.248"
   },

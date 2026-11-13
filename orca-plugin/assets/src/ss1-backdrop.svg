@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2b4d"/><stop offset="0.5" stop-color="#061b32"/><stop offset="1" stop-color="#030f1e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.12" cy="0.12" r="0.6">
+      <stop offset="0" stop-color="#e9a3ed" stop-opacity="0.18"/><stop offset="1" stop-color="#e9a3ed" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ss" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3b9f0"/><stop offset="1" stop-color="#d957c6"/></linearGradient>
+    <linearGradient id="sf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e3157"/><stop offset="1" stop-color="#071f3a"/></linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <rect width="1280" height="800" fill="url(#glow)"/>
+
+  <!-- brand mark -->
+  <g transform="translate(86,70) scale(0.105)">
+    <rect width="512" height="512" rx="116" fill="#071f3a" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+    <path d="M256 92 L366 132 Q380 137 380 152 L380 268 C380 346 330 396 256 430 C182 396 132 346 132 268 L132 152 Q132 137 146 132 Z" fill="url(#sf)" stroke="url(#ss)" stroke-width="14" stroke-linejoin="round"/>
+    <polyline points="214,176 262,216 214,256" fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="276" y1="258" x2="324" y2="258" stroke="#e9a3ed" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="212" cy="332" r="16" fill="#f85149"/><circle cx="256" cy="332" r="16" fill="#d29922"/><circle cx="300" cy="332" r="16" fill="#2ea043"/>
+  </g>
+  <text x="156" y="108" font-family="DejaVu Sans, sans-serif" font-size="25" font-weight="bold" fill="#cdd9e5" letter-spacing="1">AGENT CLI PERMISSIONS</text>
+
+  <text x="88" y="320" font-family="DejaVu Sans, sans-serif" font-size="50" font-weight="bold" fill="#ffffff">See every rule</text>
+  <text x="88" y="382" font-family="DejaVu Sans, sans-serif" font-size="50" font-weight="bold" fill="#ffffff">at a glance</text>
+
+  <g font-family="DejaVu Sans, sans-serif" font-size="26" fill="#9fb3c8">
+    <text x="88" y="456">207 rules across company</text>
+    <text x="88" y="494">baseline and project tiers —</text>
+    <text x="88" y="532">grouped and searchable.</text>
+  </g>
+
+  <g font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="bold">
+    <rect x="88" y="600" width="128" height="54" rx="27" fill="#f85149" fill-opacity="0.14" stroke="#f85149" stroke-width="2"/>
+    <text x="152" y="635" fill="#ff8b85" text-anchor="middle">DENY</text>
+    <text x="226" y="636" fill="#5b7088" font-size="28">&gt;</text>
+    <rect x="252" y="600" width="110" height="54" rx="27" fill="#d29922" fill-opacity="0.14" stroke="#d29922" stroke-width="2"/>
+    <text x="307" y="635" fill="#f0c061" text-anchor="middle">ASK</text>
+    <text x="372" y="636" fill="#5b7088" font-size="28">&gt;</text>
+    <rect x="398" y="600" width="140" height="54" rx="27" fill="#2ea043" fill-opacity="0.14" stroke="#2ea043" stroke-width="2"/>
+    <text x="468" y="635" fill="#5ad67d" text-anchor="middle">ALLOW</text>
+  </g>
+</svg>
