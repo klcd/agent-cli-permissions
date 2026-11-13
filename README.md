@@ -250,6 +250,14 @@ agent-cli-permissions/
 
 ---
 
+## Design Decisions
+
+Significant architectural decisions are recorded as ADRs in [`docs/adr/`](docs/adr/) — notably
+[ADR 0001](docs/adr/0001-minimal-orca-plugin-worker.md), on keeping the Orca plugin worker a
+minimal, review-friendly permissions core.
+
+---
+
 ## License
 
 [Apache-2.0](LICENSE)
