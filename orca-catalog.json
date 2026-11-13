@@ -18,6 +18,56 @@
       ],
       "releases": [
         {
+          "version": "0.1.1",
+          "commit": "e4d241f3095a0fff71df076b6e1d8cc2e37a1dc2",
+          "contentHash": "4d48b72889972fe7a1e784586b00ed59ecfb13365877cbc0a4bb0d7613e07a0c",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Agent CLI Permissions",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "CLI Permissions"
+            },
+            {
+              "kind": "commands",
+              "name": "Agent Permissions: Sync Canonical YAML Rules"
+            }
+          ],
+          "images": {
+            "icon": {
+              "path": "orca-plugin/assets/icon.png",
+              "alt": "Agent CLI Permissions",
+              "sha256": "5c1ecba7fd957d7b87a6fe7c3ddf604897c730ad667b08847961847b47328c5a",
+              "width": 512,
+              "height": 512
+            },
+            "cover": {
+              "path": "orca-plugin/assets/cover.png",
+              "alt": "Agent CLI Permissions: two-tier permission governance for AI coding agents, with the DENY > ASK > ALLOW precedence chain and target agent names.",
+              "sha256": "bc33b05735c70c95d318c347fbc772536606d97a466bb5c918d2d89978a640f0",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "orca-plugin/assets/screenshot-1-rules.png",
+                "alt": "The panel showing 207 rules across the company baseline and project tiers, colour-coded allow or deny and grouped by permission set.",
+                "sha256": "47e75a79d8d8f61714e0b746180bc0ef9f55d2484146fbe718d9e407d623334a",
+                "width": 1280,
+                "height": 800
+              },
+              {
+                "path": "orca-plugin/assets/screenshot-2-sidebar.png",
+                "alt": "The panel in the Orca sidebar with a command tester, governance badges for remote policy, auto-sync and git gate, and an Enforce button.",
+                "sha256": "56e88a8e176110e9a4adcc0490933d6af3a74f3d5782f40340c969555030c7b8",
+                "width": 1280,
+                "height": 800
+              }
+            ]
+          }
+        },
+        {
           "version": "0.1.0",
           "commit": "70023a6583e7797fd8e3f7d7b57bd75b770bc132",
           "contentHash": "ce2ce83a7135566c8c4756d195af6a6cb9b5e5af0d4a155bdc2a7e18586f86da",
