@@ -12,11 +12,65 @@
         "ref": "main",
         "path": "orca-plugin"
       },
-      "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test CLI commands against permission groups, and sync rules across AI agents.",
+      "description": "Inspect canonical .agents/permissions/*.yml CLI command rules (DENY > ASK > ALLOW), test commands against permission groups, and sync them into the native permission formats of compatible AI coding agents (Claude Code, Codex, Antigravity, and more).",
       "categories": [
         "developer-tools"
       ],
       "releases": [
+        {
+          "version": "0.1.2",
+          "commit": "72873710df7ca598e0115dc8fd359bff2daf48b8",
+          "contentHash": "ed6a9a113ac200cbb2890f20b231d4e39500a16968a4923fb6f6487e65060c07",
+          "execution": "trusted-worker",
+          "minimumOrca": "1.4.248",
+          "name": "Agent CLI Permissions",
+          "contributes": [
+            {
+              "kind": "panels",
+              "name": "CLI Permissions"
+            },
+            {
+              "kind": "commands",
+              "name": "Agent Permissions: Sync Canonical YAML Rules"
+            }
+          ],
+          "capabilities": [
+            "workspace:read",
+            "notifications:show"
+          ],
+          "images": {
+            "icon": {
+              "path": "orca-plugin/assets/icon.png",
+              "alt": "Agent CLI Permissions",
+              "sha256": "5c1ecba7fd957d7b87a6fe7c3ddf604897c730ad667b08847961847b47328c5a",
+              "width": 512,
+              "height": 512
+            },
+            "cover": {
+              "path": "orca-plugin/assets/cover.png",
+              "alt": "Agent CLI Permissions: two-tier permission governance for AI coding agents, with the DENY > ASK > ALLOW precedence chain and target agent names.",
+              "sha256": "6ed320d51d50ec345c7c0286aece6ad48ad125602103d96f0b04104cffa78206",
+              "width": 1600,
+              "height": 1000
+            },
+            "screenshots": [
+              {
+                "path": "orca-plugin/assets/screenshot-1-rules.png",
+                "alt": "The panel showing 207 rules across the company baseline and project tiers, colour-coded allow or deny and grouped by permission set.",
+                "sha256": "47e75a79d8d8f61714e0b746180bc0ef9f55d2484146fbe718d9e407d623334a",
+                "width": 1280,
+                "height": 800
+              },
+              {
+                "path": "orca-plugin/assets/screenshot-2-sidebar.png",
+                "alt": "The panel in the Orca sidebar with a command tester, governance badges for remote policy, auto-sync and git gate, and an Enforce button.",
+                "sha256": "56e88a8e176110e9a4adcc0490933d6af3a74f3d5782f40340c969555030c7b8",
+                "width": 1280,
+                "height": 800
+              }
+            ]
+          }
+        },
         {
           "version": "0.1.1",
           "commit": "e4d241f3095a0fff71df076b6e1d8cc2e37a1dc2",
